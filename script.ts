@@ -1730,6 +1730,16 @@ Il2Cpp.perform(() => {
 		}
 		pluginsScanned = true;
 		let added = 0;
+		// Unload plugins whose files were removed. Never do this when the directory
+		// scan itself failed, because listJs() already returned above in that case.
+		for (let i = pluginList.length - 1; i >= 0; i--) {
+			const pl = pluginList[i];
+			if (!pl.builtin && !files.includes(pl.file)) {
+				if (pl.enabled) disablePlugin(pl);
+				pluginList.splice(i, 1);
+				log("plugin removed: " + pl.file);
+			}
+		}
 		for (const f of files) {
 			let code = "";
 			try { code = (File as any).readAllText(pluginDir + "/" + f); }
@@ -1790,11 +1800,16 @@ Il2Cpp.perform(() => {
 		const bag: any = {};
 		for (const d of pl.props) {
 			if (!d.key || d.type === "button" || d.type === "label") continue;
-			const def = d.default !== undefined ? d.default
+			let def = d.default !== undefined ? d.default
 				: d.type === "bool" ? false
 				: d.type === "select" ? (d.options?.[0] ?? "")
 				: d.type === "text" ? (d.values?.[0] ?? "")
 				: (d.min ?? 0);
+			if (d.type === "float" || d.type === "int") {
+				const lo = d.min ?? 0, hi = d.max ?? (d.type === "int" ? 10 : 1);
+				def = Number.isFinite(Number(def)) ? Math.max(lo, Math.min(hi, Number(def))) : lo;
+				if (d.type === "int") def = Math.round(def);
+			}
 			const r = pl.propRefs[d.key] ?? (pl.propRefs[d.key] = ref(
 				d.type === "select" ? Math.max(0, (d.options ?? []).indexOf(def))
 				: d.type === "text" ? Math.max(0, (d.values ?? [def]).indexOf(def))
@@ -1807,7 +1822,13 @@ Il2Cpp.perform(() => {
 				set: (v: any) => {
 					if (d.type === "select") { const i = (d.options ?? []).indexOf(v); if (i >= 0) r.v = i; }
 					else if (d.type === "text") { if (d.values && d.values.length) { const i = d.values.indexOf(v); if (i >= 0) r.v = i; } else r.strv = v; }
-					else r.v = v;
+					else {
+						if (d.type === "float" || d.type === "int") {
+							const lo = d.min ?? 0, hi = d.max ?? (d.type === "int" ? 10 : 1);
+							const n = Number(v);
+							if (Number.isFinite(n)) r.v = d.type === "int" ? Math.round(Math.max(lo, Math.min(hi, n))) : Math.max(lo, Math.min(hi, n));
+						} else r.v = v;
+					}
 				},
 			});
 		}
