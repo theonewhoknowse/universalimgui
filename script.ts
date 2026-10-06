@@ -3136,6 +3136,7 @@ Il2Cpp.perform(() => {
 		return "gaze";
 	}
 	let triggerLatched = false, triggerInputAvailable = false, triggerSource = "none";
+	let triggerDebugLast = "";
 	function anyClick(): boolean {
 		let value = 0, available = false, source = "none";
 		if (xrReady) {
@@ -3165,6 +3166,8 @@ Il2Cpp.perform(() => {
 		}
 		triggerInputAvailable = available;
 		triggerSource = source;
+		const triggerDebug = "R Trigger: " + value.toFixed(2) + " | " + source + " | " + (available ? (triggerLatched ? "PRESSED" : "released") : "NO INPUT");
+		if (triggerDebug !== triggerDebugLast) { triggerDebugLast = triggerDebug; log(triggerDebug); }
 		const releaseThreshold = Math.max(0.08, TRIG_THRESH * 0.62);
 		if (triggerLatched) triggerLatched = value > releaseThreshold;
 		else triggerLatched = value > TRIG_THRESH;
