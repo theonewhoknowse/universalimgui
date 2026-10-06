@@ -2341,6 +2341,53 @@ Il2Cpp.perform(() => {
 	}
 
 
+	let visualRainbow = false, visualInvert = false, visualCRT = false, visualMatrix = false;
+	let visualError = false, visualDoom = false, visualWin95 = false;
+	let visualBaseColors: { [k: string]: number[] } | null = null;
+
+	function visualSetup() {
+		if (visualBaseColors) return;
+		visualBaseColors = {};
+		for (const k in C) visualBaseColors[k] = C[k].slice();
+	}
+	function visualRgb(t: number): number[] {
+		return [0.5 + 0.5 * Math.sin(t), 0.5 + 0.5 * Math.sin(t + 2.094), 0.5 + 0.5 * Math.sin(t + 4.188), 1];
+	}
+	function visualApply() {
+		visualSetup();
+		const base = visualBaseColors!;
+		for (const k in base) C[k] = base[k].slice();
+		const t = Date.now() * 0.003;
+		if (visualRainbow) {
+			const rgb = visualRgb(t);
+			for (const k of ["Accent","Button","ButtonHovered","ButtonActive","Header","HeaderHovered","HeaderActive","TabHovered","TabActive","SliderFill","SliderFillActive","SliderGrab","SliderGrabActive","Laser"])
+				if (C[k]) C[k] = [rgb[0], rgb[1], rgb[2], C[k][3]];
+			C.Border = [rgb[0], rgb[1], rgb[2], base.Border[3]];
+		}
+		if (visualInvert) for (const k in C) {
+			const b = C[k]; C[k] = [1 - b[0], 1 - b[1], 1 - b[2], b[3]];
+		}
+		if (visualDoom) {
+			C.WindowBg=[0.035,0,0,0.97]; C.TitleBg=[0.08,0,0,1]; C.TitleBgActive=[0.22,0,0,1];
+			C.Accent=[1,0.12,0.02,1]; C.Button=[0.42,0.015,0.005,0.9]; C.ButtonHovered=[0.9,0.04,0.01,1]; C.ButtonActive=[1,0.16,0.02,1];
+			C.Text=[1,0.72,0.58,1]; C.TextDisabled=[0.7,0.35,0.2,0.85];
+		}
+		if (visualWin95) {
+			C.WindowBg=[0.72,0.72,0.72,1]; C.TitleBg=[0.02,0.18,0.55,1]; C.TitleBgActive=[0.05,0.28,0.75,1];
+			C.RowBg=[0.82,0.82,0.82,1]; C.FrameBg=[0.9,0.9,0.9,1]; C.FrameBgHovered=[1,1,1,1]; C.FrameBgActive=[0.7,0.8,0.95,1];
+			C.Button=[0.78,0.78,0.78,1]; C.ButtonHovered=[0.92,0.92,0.92,1]; C.ButtonActive=[0.65,0.75,0.9,1];
+			C.Text=[0,0,0,1]; C.TextDisabled=[0.25,0.25,0.25,1]; C.Accent=[0.02,0.18,0.55,1]; C.Border=[0.1,0.1,0.1,1];
+		}
+		style.opacity = visualCRT ? 0.86 : 1;
+		style.spin = visualCRT ? 75 : SPIRAL_SPIN;
+	}
+	function visualMatrixLines(): string[] {
+		const chars="01アイウエオカキクケコｱｲｳｴｵ";
+		const out:string[]=[]; const seed=Math.floor(Date.now()/140);
+		for(let row=0;row<5;row++){let line="";for(let col=0;col<24;col++)line+=chars[(seed+row*17+col*31)%chars.length];out.push(line);}
+		return out;
+	}
+
 	function funTab() {
 		text("Groq AI", C.Accent);
 		text("Type a prompt with the Quest keyboard, then send it.", C.TextDisabled);
@@ -2357,31 +2404,40 @@ Il2Cpp.perform(() => {
 		text("Visual Toys", C.Accent);
 		text("Purely visual effects for the menu and HUD.", C.TextDisabled);
 		if (button("Rainbow UI")) {
-			const on = !(globalThis as any).__toyRainbowUI;
-			(globalThis as any).__toyRainbowUI = on;
-			notify("Rainbow UI " + (on ? "on" : "off"));
+			visualRainbow=!visualRainbow; notify("Rainbow UI "+(visualRainbow?"on":"off"));
 		}
 		if (button("Invert UI")) {
-			(globalThis as any).__toyInvertUI = !(globalThis as any).__toyInvertUI;
-			notify("UI invert " + ((globalThis as any).__toyInvertUI ? "on" : "off"));
+			visualInvert=!visualInvert; notify("UI invert "+(visualInvert?"on":"off"));
 		}
 		if (button("CRT Mode")) {
-			(globalThis as any).__toyCRT = !(globalThis as any).__toyCRT;
-			notify("CRT mode " + ((globalThis as any).__toyCRT ? "on" : "off"));
+			visualCRT=!visualCRT; notify("CRT mode "+(visualCRT?"on":"off"));
 		}
 		if (button("Matrix Rain")) {
-			(globalThis as any).__toyMatrix = !(globalThis as any).__toyMatrix;
-			notify("Matrix rain " + ((globalThis as any).__toyMatrix ? "on" : "off"));
+			visualMatrix=!visualMatrix; notify("Matrix rain "+(visualMatrix?"on":"off"));
 		}
-		if (button("Fake Error Screen")) notify("SYSTEM ERROR: absolutely nothing is wrong.");
-		if (button("Doom Mode")) notify("DOOM MODE ENABLED. Rip and tear... the UI.");
-		if (button("Windows 95 Mode")) notify("Windows 95 mode: spiritually activated.");
+		if (button("Fake Error Screen")) { visualError=!visualError; notify("Fake error screen "+(visualError?"on":"off")); }
+		if (button("Doom Mode")) { visualDoom=!visualDoom; notify("Doom mode "+(visualDoom?"on":"off")); }
+		if (button("Windows 95 Mode")) { visualWin95=!visualWin95; notify("Windows 95 mode "+(visualWin95?"on":"off")); }
 		if (button("Reset Visual Toys")) {
-			(globalThis as any).__toyRainbowUI = false;
-			(globalThis as any).__toyInvertUI = false;
-			(globalThis as any).__toyCRT = false;
-			(globalThis as any).__toyMatrix = false;
+			visualRainbow=false; visualInvert=false; visualCRT=false; visualMatrix=false; visualError=false; visualDoom=false; visualWin95=false; visualApply();
 			notify("Visual toys reset");
+		}
+
+		if (visualMatrix) {
+			text("MATRIX RAIN", C.Accent);
+			for (const line of visualMatrixLines()) text(line, C.Text);
+		}
+		if (visualError) {
+			separator();
+			text("████ SYSTEM FAILURE ████", C.Accent);
+			text("KERNEL PANIC: UI.EXE", C.Text);
+			text("ERROR 0xC0FFEE", C.Text);
+			text("Reality.dll has stopped responding.", C.TextDisabled);
+			text("Press RESET to continue.", C.TextDisabled);
+		}
+		if (visualCRT) {
+			text("────────────────────────", C.TextDisabled);
+			text("CRT SIGNAL // 60Hz // SCANLINES", C.TextDisabled);
 		}
 
 		separator();
@@ -3148,6 +3204,7 @@ Il2Cpp.perform(() => {
 	}
 
 	function tick() {
+		visualApply();
 		updateRig();
 		runMainQueue();
 		initResources();
