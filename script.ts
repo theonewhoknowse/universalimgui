@@ -95,6 +95,7 @@ function drawMenu(ui: any): void {
 		}
 		if (ui.tabItem("Plugins")) ui.pluginsTab();
 		if (ui.tabItem("Info")) ui.info();
+		if (ui.tabItem("Debug")) ui.debug();
 		if (ui.tabItem("Settings")) ui.settings();
 		ui.endTabBar();
 	}
@@ -1984,6 +1985,67 @@ Il2Cpp.perform(() => {
 				"Open", () => { if (!openUrl(DISCORD_URL)) notify("Couldn't open a browser here - " + DISCORD_URL.replace("https://", ""), 10); });
 		}
 	}
+	function debugGameObjects(includeInactive: boolean = true): number {
+		let arr: any = null;
+		try {
+			const findAll = Resources.tryMethod ? Resources.tryMethod("FindObjectsOfTypeAll", 1) : null;
+			if (findAll) arr = findAll.inflate ? findAll.inflate(GameObject).invoke() : findAll.invoke(GameObject.type.object);
+		} catch (e) { errOnce("debug GameObject scan", e); }
+		if (!arr) { notify("GameObject scan unavailable"); return 0; }
+		let printed = 0;
+		try { console.log("[imgui][debug] === GameObjects (" + arr.length + ") ==="); } catch {}
+		for (let i = 0; i < arr.length; i++) {
+			try {
+				const go = arr.get(i);
+				if (!go || go.isNull()) continue;
+				const active = !!M(go, "get_activeInHierarchy", 0)?.invoke();
+				if (!includeInactive && !active) continue;
+				let name = "<unnamed>";
+				try { name = String(M(go, "get_name", 0).invoke().content); } catch {}
+				let path = name;
+				try {
+					let t = M(go, "get_transform", 0).invoke();
+					const parts: string[] = [];
+					for (let depth = 0; t && !t.isNull() && depth < 64; depth++) {
+						let tn = "?"; try { tn = String(M(t, "get_name", 0).invoke().content); } catch {}
+						parts.unshift(tn);
+						const p = M(t, "get_parent", 0); t = p ? p.invoke() : null;
+					}
+					if (parts.length) path = parts.join("/");
+				} catch {}
+				let id = "?"; try { id = String(M(go, "GetInstanceID", 0).invoke()); } catch {}
+				console.log("[imgui][debug] " + (active ? "[ACTIVE] " : "[INACTIVE] ") + path + "  (ID " + id + ")");
+				printed++;
+			} catch {}
+		}
+		notify("Printed " + printed + " GameObjects to console");
+		return printed;
+	}
+	function debugCountObjects(): number {
+		let arr: any = null;
+		try {
+			const findAll = Resources.tryMethod ? Resources.tryMethod("FindObjectsOfTypeAll", 1) : null;
+			if (findAll) arr = findAll.inflate ? findAll.inflate(GameObject).invoke() : findAll.invoke(GameObject.type.object);
+		} catch (e) { errOnce("debug GameObject count", e); }
+		const n = arr ? arr.length : 0;
+		console.log("[imgui][debug] GameObject count: " + n);
+		notify("GameObjects: " + n);
+		return n;
+	}
+	function debugAssemblies(): number {
+		let n = 0;
+		console.log("[imgui][debug] === Assemblies ===");
+		for (const a of Il2Cpp.domain.assemblies) { try { console.log("[imgui][debug] " + a.name); n++; } catch {} }
+		notify("Printed " + n + " assemblies to console");
+		return n;
+	}
+	function debugRunDiag(): string {
+		const r = compatReport();
+		console.log("[imgui][debug]\\n" + r);
+		notify("Diagnostics printed to console");
+		return r;
+	}
+
 	function info() {
 		const bad = [1, 0.45, 0.5, 1];
 		text("FPS: " + fps.toFixed(0) + "   |   script cost: " + (perfStats.tickMs + perfStats.lateMs).toFixed(1) + " ms/frame, UI passes " + perfStats.fullPerSec.toFixed(0) + "/s");
@@ -2619,6 +2681,17 @@ Il2Cpp.perform(() => {
 		button, checkbox, sliderFloat, sliderInt, combo, collapsingHeader, separator, spacing, sameLine, indent, unindent,
 		progressBar, beginTabBar, tabItem, endTabBar, settings, info, notify, confirm, openUrl, style, ref,
 		pluginsTab, plugins: () => filePlugins(), pluginPage,
+		debug: () => {
+			if (button("Print All GameObjects")) debugGameObjects(true);
+			if (button("Print Active GameObjects")) debugGameObjects(false);
+			if (button("Count GameObjects")) debugCountObjects();
+			separator();
+			if (button("Print Loaded Assemblies")) debugAssemblies();
+			if (button("Print Compatibility Diagnostics")) debugRunDiag();
+			separator();
+			text("Debug actions print to the Frida console.", C.TextDisabled);
+			text("GameObject paths include their Transform hierarchy.", C.TextDisabled);
+		},
 		theme: (name: string) => applyTheme(name), themes: () => THEME_NAMES.slice(),
 		fonts: () => loadedFonts.map(f => f.name),
 		recenter: () => { for (const w of wins.values()) place(w); },
