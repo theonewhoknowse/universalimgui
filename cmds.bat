@@ -1,0 +1,1 @@
+frida -U -l frida-il2cpp-bridge.js -l fridaimgui.ts "Newton's Playground"
