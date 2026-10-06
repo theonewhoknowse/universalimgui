@@ -875,7 +875,7 @@ Il2Cpp.perform(() => {
 		private dx = [0, 0, 0];
 		private t = 0;
 		constructor(private minCutoff: number, private beta: number, private dCutoff: number = 1) {}
-		reset() { this.x = null; }
+		reset() { this.x = null; this.dx = [0, 0, 0]; this.t = 0; }
 		filter(v: number[], nowMs: number): number[] {
 			const x = this.x;
 			if (!x) { this.x = [v[0], v[1], v[2]]; this.t = nowMs; return [v[0], v[1], v[2]]; }
@@ -1731,10 +1731,26 @@ Il2Cpp.perform(() => {
 		pluginsScanned = true;
 		let added = 0;
 		for (const f of files) {
-			if (pluginList.some(p => p.file === f)) continue;
 			let code = "";
 			try { code = (File as any).readAllText(pluginDir + "/" + f); }
-			catch (e) { pluginList.push({ name: f, file: f, builtin: false, status: "can't read: " + e, logs: [], draw: null, frame: null, fails: 0 }); continue; }
+			catch (e) {
+				if (!pluginList.some(p => p.file === f))
+					pluginList.push({ name: f, file: f, builtin: false, status: "can't read: " + e, logs: [], draw: null, frame: null, fails: 0 });
+				continue;
+			}
+			const existing = pluginList.find(p => p.file === f);
+			if (existing) {
+				if (existing.code !== code) {
+					const wasOn = existing.enabled !== false;
+					if (wasOn) disablePlugin(existing);
+					globalThis.__imguiMain(() => {
+						runPlugin(existing, code);
+						if (!wasOn) existing.enabled = false;
+					});
+					added++;
+				}
+				continue;
+			}
 			const pl: Plugin = { name: f.replace(/\.js$/i, "").replace(/^\d+_/, ""), file: f, builtin: false, status: "loading", logs: [], draw: null, frame: null, fails: 0 };
 			pluginList.push(pl);
 			(globalThis as any).__imguiMain(() => runPlugin(pl, code));
@@ -2129,14 +2145,22 @@ Il2Cpp.perform(() => {
 	let lastAssetCheck = 0;
 	function rebuildShapes() {
 		log("menu assets were freed (scene load) - rebuilding");
-		// Protected meshes/materials do not get reclaimed by Resources.UnloadUnusedAssets,
-		// so explicitly release our old generated assets before rebuilding them.
-		for (const m of meshCache.values()) { try { destroy(m); } catch {} }
+		// Protected meshes/materials/textures do not get reclaimed automatically,
+		// so release every generated asset before rebuilding them.
+		const doomed = new Set<any>();
+		for (const m of meshCache.values()) doomed.add(m);
+		if (unitMesh) doomed.add(unitMesh);
+		if (circleTex) doomed.add(circleTex);
+		if (ringTex) doomed.add(ringTex);
+		if (uiMat) doomed.add(uiMat);
+		if (topMat) doomed.add(topMat);
 		for (const w of wins.values()) {
-			if (w.pattern?.pmesh) { try { destroy(w.pattern.pmesh); } catch {} }
-			for (const pool of w.rpool ?? []) for (const e of pool) if (e?.owned) { try { destroy(e.owned); } catch {} }
+			if (w.pattern?.pmesh) doomed.add(w.pattern.pmesh);
+			for (const pool of w.rpool ?? []) for (const e of pool) if (e?.owned) doomed.add(e.owned);
 		}
+		for (const o of doomed) { try { destroy(o); } catch {} }
 		meshCache.clear();
+		activeId = ""; activeWin = null; dragWin = null; resizeStart = null; scrollDrag = null; openPopup = null;
 		shapesTried = false; roundOK = false; meshMode = "";
 		circleTex = ringTex = unitMesh = uiMat = topMat = null;
 		for (const w of wins.values()) {
@@ -2615,10 +2639,17 @@ Il2Cpp.perform(() => {
 	function runMainQueue() {
 		if (!mainQueue.length) return;
 		const now = Date.now();
-		for (let i = 0; i < mainQueue.length;) {
+		let ran = 0;
+		for (let i = 0; i < mainQueue.length && ran < 32;) {
 			if (mainQueue[i].at > now) { i++; continue; }
 			const job = mainQueue.splice(i, 1)[0];
 			try { job.fn(); } catch (e) { errOnce("main-thread task", e); }
+			ran++;
+		}
+		// A broken plugin should never be able to grow this queue forever.
+		if (mainQueue.length > 512) {
+			mainQueue.splice(0, mainQueue.length - 512);
+			errOnce("main-thread queue", "queue exceeded 512 jobs; dropped oldest pending jobs");
 		}
 	}
 
@@ -2816,7 +2847,7 @@ Il2Cpp.perform(() => {
 				const hn: string = hm.name;
 				hm.implementation = function (this: any) {
 					let r: any;
-					try { r = this.method(hn, 0).invoke(); } catch {}
+					try { r = callOriginal(this, hn); } catch {}
 					tickOnce(PlayerCls.name + "." + hn);
 					return r;
 				};
