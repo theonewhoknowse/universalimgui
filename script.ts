@@ -1951,9 +1951,11 @@ Il2Cpp.perform(() => {
 		if (button("Send Test Notification")) notify("Test notification");
 		sameLine();
 		if (button("Recenter")) for (const w of wins.values()) place(w);
-		sameLine();
-		if (button("Join Discord")) confirm("Open Discord?", ["This opens " + DISCORD_URL.replace("https://", "") + " in your browser.", "The game will go to the background."],
-			"Open", () => { if (!openUrl(DISCORD_URL)) notify("Couldn't open a browser here - " + DISCORD_URL.replace("https://", ""), 10); });
+		if (DISCORD_URL) {
+			sameLine();
+			if (button("Join Discord")) confirm("Open Discord?", ["This opens " + DISCORD_URL.replace("https://", "") + " in your browser.", "The game will go to the background."],
+				"Open", () => { if (!openUrl(DISCORD_URL)) notify("Couldn't open a browser here - " + DISCORD_URL.replace("https://", ""), 10); });
+		}
 	}
 	function info() {
 		const bad = [1, 0.45, 0.5, 1];
