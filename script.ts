@@ -93,6 +93,7 @@ function drawMenu(ui: any): void {
 			}
 			ui.text("Add as many tabs as you like - the strip splits the width evenly.");
 		}
+		if (ui.tabItem("Fun")) ui.fun();
 		if (ui.tabItem("Plugins")) ui.pluginsTab();
 		if (ui.tabItem("Info")) ui.info();
 		if (ui.tabItem("Debug")) ui.debug();
@@ -158,6 +159,7 @@ Il2Cpp.perform(() => {
 	const asmUIM  = needAsm("UnityEngine.UIModule");
 	const asmUI   = needAsm("UnityEngine.UI");
 	const asmText = needAsm("UnityEngine.TextRenderingModule");
+	const asmNet  = Il2Cpp.domain.tryAssembly("UnityEngine.UnityWebRequestModule")?.image ?? null;
 
 	const GameObject   = need(asmCore, "UnityEngine.GameObject");
 	const UEObject     = need(asmCore, "UnityEngine.Object");
@@ -175,6 +177,8 @@ Il2Cpp.perform(() => {
 	const UIText       = need(asmUI,   "UnityEngine.UI.Text");
 	const Font         = need(asmText, "UnityEngine.Font");
 	const Camera       = asmCore.tryClass("UnityEngine.Camera");
+	const TouchKeyboard = asmCore.tryClass("UnityEngine.TouchScreenKeyboard");
+	const UnityWebRequest = asmNet ? asmNet.tryClass("UnityEngine.Networking.UnityWebRequest") : null;
 
 	function hookMethodOf(k: any): any {
 		for (const n of PLAYER_HOOK_METHODS) { const m = k.tryMethod(n, 0); if (m) return m; }
@@ -2046,6 +2050,145 @@ Il2Cpp.perform(() => {
 		return r;
 	}
 
+	let funInput = "";
+	let funReply = "";
+	let funStatus = "Ready";
+	let funKeyboard: any = null;
+	let funRequest: any = null;
+	let funRequestOp: any = null;
+	let funApiKey = "";
+	let funModel = "llama-3.3-70b-versatile";
+
+	function funOpenKeyboard() {
+		if (!TouchKeyboard) { notify("TouchScreenKeyboard is unavailable"); return; }
+		try {
+			const m = TouchKeyboard.method("Open", 1);
+			funKeyboard = m.invoke(Il2Cpp.string(funInput));
+			if (funKeyboard) {
+				try { funKeyboard.method("set_characterLimit", 1).invoke(500); } catch {}
+				funStatus = "Typing...";
+			}
+		} catch (e) {
+			funKeyboard = null;
+			funStatus = "Keyboard error";
+			errOnce("fun keyboard", e);
+		}
+	}
+
+	function funCloseKeyboard() {
+		if (!funKeyboard) return;
+		try { funKeyboard.method("set_active", 1).invoke(false); } catch {}
+		funKeyboard = null;
+	}
+
+	function funUpdateKeyboard() {
+		if (!funKeyboard) return;
+		try {
+			const t = funKeyboard.method("get_text", 0).invoke();
+			if (t !== null && t !== undefined) funInput = String(t);
+		} catch {}
+		try {
+			const done = !!funKeyboard.method("get_done", 0).invoke();
+			const canceled = !!funKeyboard.method("get_wasCanceled", 0).invoke();
+			if (canceled) { funStatus = "Canceled"; funCloseKeyboard(); }
+			else if (done) { funStatus = funInput.length ? "Ready to send" : "Ready"; funCloseKeyboard(); }
+		} catch {}
+	}
+
+	function funSend() {
+		if (funRequest) { notify("Groq request already running"); return; }
+		if (!funApiKey) { notify("Set key first: groq.setKey(\"...\")"); funStatus = "No API key"; return; }
+		const prompt = funInput.trim();
+		if (!prompt) { notify("Type something first"); return; }
+		if (!UnityWebRequest) { notify("UnityWebRequest unavailable"); funStatus = "HTTP unavailable"; return; }
+
+		const body = JSON.stringify({
+			model: funModel,
+			messages: [
+				{ role: "system", content: "You are a fun, concise assistant inside a VR mod menu. Keep replies under 700 characters unless the user asks for more." },
+				{ role: "user", content: prompt }
+			],
+			temperature: 0.8,
+			max_completion_tokens: 300
+		});
+
+		try {
+			const post = UnityWebRequest.method("Post", 3);
+			funRequest = post.invoke(Il2Cpp.string("https://api.groq.com/openai/v1/chat/completions"), Il2Cpp.string(body), Il2Cpp.string("application/json"));
+			if (!funRequest) throw new Error("Post returned null");
+			funRequest.method("SetRequestHeader", 2).invoke(Il2Cpp.string("Authorization"), Il2Cpp.string("Bearer " + funApiKey));
+			funRequest.method("SetRequestHeader", 2).invoke(Il2Cpp.string("Accept"), Il2Cpp.string("application/json"));
+			try { funRequest.method("set_timeout", 1).invoke(30); } catch {}
+			funRequestOp = funRequest.method("SendWebRequest", 0).invoke();
+			funStatus = "Thinking...";
+			funReply = "";
+			console.log("[groq] user: " + prompt);
+		} catch (e) {
+			funRequest = null; funRequestOp = null;
+			funStatus = "Request error";
+			errOnce("groq send", e);
+			notify("Groq request failed");
+		}
+	}
+
+	function funPollRequest() {
+		if (!funRequest) return;
+		try {
+			if (funRequestOp && !funRequestOp.method("get_isDone", 0).invoke()) return;
+			const err = funRequest.method("get_error", 0).invoke();
+			const code = funRequest.method("get_responseCode", 0).invoke();
+			const dh = funRequest.method("get_downloadHandler", 0).invoke();
+			const raw = dh ? String(dh.method("get_text", 0).invoke() ?? "") : "";
+			if (err || code < 200 || code >= 300) {
+				funStatus = "HTTP " + code;
+				funReply = String(err || raw || "Unknown HTTP error").slice(0, 900);
+				console.log("[groq] error " + code + ": " + funReply);
+				notify("Groq HTTP " + code);
+			} else {
+				const data = JSON.parse(raw);
+				const reply = data?.choices?.[0]?.message?.content;
+				if (!reply) throw new Error("No choices[0].message.content in response");
+				funReply = String(reply).trim();
+				funStatus = "Done";
+				console.log("[groq] assistant: " + funReply);
+				notify("Groq replied");
+			}
+		} catch (e) {
+			funStatus = "Parse/error";
+			funReply = String(e).slice(0, 900);
+			console.log("[groq] " + funReply);
+			notify("Groq response error");
+		}
+		try { funRequest.method("Dispose", 0).invoke(); } catch {}
+		funRequest = null; funRequestOp = null;
+	}
+
+	(globalThis as any).groq = {
+		setKey: (key: string) => { funApiKey = String(key || ""); return !!funApiKey; },
+		clearKey: () => { funApiKey = ""; return true; },
+		setModel: (model: string) => { funModel = String(model || "llama-3.3-70b-versatile"); return funModel; },
+		ask: (prompt: string) => { funInput = String(prompt || ""); funSend(); return true; },
+		status: () => ({ status: funStatus, reply: funReply, model: funModel, keySet: !!funApiKey }),
+	};
+
+	function funTab() {
+		text("Groq AI", C.Accent);
+		text("Type a prompt with the Quest keyboard, then send it.", C.TextDisabled);
+		if (button("Prompt: " + (funInput ? funInput.slice(0, 72) : "(tap to type)"))) funOpenKeyboard();
+		if (button("Send to Groq")) funSend();
+		if (funRequest) progressBar(0.5, "Groq is thinking...");
+		text("Status: " + funStatus, C.TextDisabled);
+		if (funReply) {
+			separator();
+			text("Response:", C.Accent);
+			for (const line of funReply.split(/\\n/)) text(line.slice(0, 180), C.Text);
+		}
+		separator();
+		text("API key: " + (funApiKey ? "set (runtime only)" : "not set"), C.TextDisabled);
+		text("Frida console: groq.setKey(\"...\")", C.TextDisabled);
+		text("Key is not stored in the repo.", C.TextDisabled);
+	}
+
 	function info() {
 		const bad = [1, 0.45, 0.5, 1];
 		text("FPS: " + fps.toFixed(0) + "   |   script cost: " + (perfStats.tickMs + perfStats.lateMs).toFixed(1) + " ms/frame, UI passes " + perfStats.fullPerSec.toFixed(0) + "/s");
@@ -2681,6 +2824,7 @@ Il2Cpp.perform(() => {
 		button, checkbox, sliderFloat, sliderInt, combo, collapsingHeader, separator, spacing, sameLine, indent, unindent,
 		progressBar, beginTabBar, tabItem, endTabBar, settings, info, notify, confirm, openUrl, style, ref,
 		pluginsTab, plugins: () => filePlugins(), pluginPage,
+		fun: funTab,
 		debug: () => {
 			if (button("Print All GameObjects")) debugGameObjects(true);
 			if (button("Print Active GameObjects")) debugGameObjects(false);
@@ -2805,6 +2949,7 @@ Il2Cpp.perform(() => {
 		initResources();
 		if (!greeted) { greeted = true; notify(MENU_TITLE + " loaded"); }
 		try { onUpdate(); } catch (e) { errOnce("onUpdate", e); }
+		try { funUpdateKeyboard(); funPollRequest(); } catch (e) { errOnce("fun", e); }
 		try { pluginsFrame(); } catch (e) { errOnce("plugins", e); }
 
 		const now = Date.now(), dt = Math.min(0.1, Math.max(0.001, (now - lastTickMs) / 1000));
