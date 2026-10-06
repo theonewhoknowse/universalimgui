@@ -39,7 +39,7 @@ const EXTRA_FRAME_HOOKS = ["HurricaneVR.Framework.Core.Player.HVRPlayerControlle
 	"UnityEngine.SpatialTracking.TrackedPoseDriver", "UnityEngine.InputSystem.XR.TrackedPoseDriver", "Valve.VR.SteamVR_Behaviour_Pose",
 	"UnityEngine.EventSystems.EventSystem"];
 const POINTER_MODE   = "auto";
-const OPEN_GESTURE   = true;
+const OPEN_GESTURE   = false;
 const POKE_REACH     = 0.07;
 
 const CONTROLLER_COMPONENTS = [
@@ -426,7 +426,14 @@ Il2Cpp.perform(() => {
 	}
 	function ovrRightTrigger(): number {
 		if (!ovr.axis) return 0;
-		try { const v = ovr.axis.invoke(ovr.index, ovr.R) as number; ovrFails.axis = 0; return v; } catch (e) { ovrFailed("axis", e); return 0; }
+		try {
+			const v: any = ovr.axis.invoke(ovr.index, ovr.R);
+			ovrFails.axis = 0;
+			if (typeof v === "number") return v;
+			if (v && typeof v.value === "number") return v.value;
+			if (v && v.handle) return v.handle.readFloat();
+			return Number(v) || 0;
+		} catch (e) { ovrFailed("axis", e); return 0; }
 	}
 
 	function asTransform(o: any): any {
@@ -3117,23 +3124,18 @@ Il2Cpp.perform(() => {
 		else { gestureT = c < 0.45 || dist > 0.9 ? gestureT + dt : 0; if (gestureT > 0.5) { gestureOn = false; gestureT = 0; } }
 		return gestureOn;
 	}
-	function readXButton(): { pressed: boolean; srcs: string[] } {
+	function readYButton(): { pressed: boolean; srcs: string[] } {
 		const srcs: string[] = [];
 		let pressed = false;
-		// Quest/XR: left controller X/Y are primary/secondary buttons.
-		// Also check the right controller and menu button so the menu remains
-		// usable across different controller mappings.
+		// Quest: Y is the left controller's secondary face button.
+		// Do not treat X, A, B, menu, or a wrist gesture as menu input.
 		if (xrReady) {
-			srcs.push("XR");
-			if (xrButton(4, usagePrimBtn) || xrButton(4, usageSecBtn) ||
-				xrButton(5, usagePrimBtn) || xrButton(5, usageSecBtn) ||
-				xrButton(4, usageMenuBtn) || xrButton(5, usageMenuBtn)) pressed = true;
+			srcs.push("XR Y");
+			if (xrButton(4, usageSecBtn)) pressed = true;
 		}
-		if (ovr.btn) { srcs.push("OVRInput"); if (ovrX()) pressed = true; }
-		if (hvrReady()) { srcs.push("HurricaneVR"); if (hvrX()) pressed = true; }
-		if (legacyOK !== false && legacyGetKey) {
-			const x = legacyKey(KEY_X);
-			if (legacyOK) { srcs.push("Unity X"); if (x) pressed = true; }
+		if (hvrReady()) {
+			srcs.push("HurricaneVR Y");
+			try { if (hvrRead(hvr.left, "SecondaryButton", "bool")) pressed = true; } catch {}
 		}
 		return { pressed, srcs };
 	}
@@ -3147,8 +3149,11 @@ Il2Cpp.perform(() => {
 	function anyClick(): boolean {
 		let value = 0, available = false, source = "none";
 		if (xrReady) {
-			if (usageTrigBtn && xrButton(5, usageTrigBtn)) { value = 1; available = true; source = "XR triggerButton"; }
-			else {
+			// Quest right trigger. Prefer the binary triggerButton, then the
+			// analog trigger value so either XR mapping can drive clicks.
+			if (usageTrigBtn && xrButton(5, usageTrigBtn)) {
+				value = 1; available = true; source = "XR triggerButton";
+			} else {
 				const xf = xrFloat(5, usageTrig);
 				if (xf !== null) { value = xf; available = true; source = "XR trigger"; }
 			}
@@ -3224,7 +3229,7 @@ Il2Cpp.perform(() => {
 
 		const now = Date.now(), dt = Math.min(0.1, Math.max(0.001, (now - lastTickMs) / 1000));
 		lastTickMs = now;
-		const xb = readXButton();
+		const xb = readYButton();
 		const haveButton = xb.srcs.length > 0;
 		const gestureAvail = OPEN_GESTURE && !!leftT && !haveButton;
 		const gestureOpen = gestureAvail ? wristGesture(dt) : false;
@@ -3448,7 +3453,7 @@ Il2Cpp.perform(() => {
 	log("frame hooks: " + [ovrUpdate ? "OVRCameraRig." + ovrUpdate.name : "", canvasHooked ? "Canvas.SendWillRenderCanvases" : "", backupSrc ? backupSrc + " (backup)" : ""].filter(s => s).join(" + ") + " | late anchoring: " + lateSrc);
 	log("input: " + (ovr.btn ? "OVRInput X" : legacyGetKey ? "Unity input (X = joystick button 2)" : "menu()") +
 		(ovr.axis ? " + trigger" : "") + (ovr.stick ? " + stick scroll" : "") + " | pointer: " + POINTER_MODE + " (auto picks ray / poke / gaze)");
-	log("ready - rig is detected on the first frames; press X/Y or use the wrist gesture to open");
+	log("ready - rig is detected on the first frames; press Y to open");
 
 	function compatReport(): string {
 		const has = (asm: string, cls: string) => { try { const a = Il2Cpp.domain.tryAssembly(asm); return !!(a && a.image.tryClass(cls)); } catch { return false; } };
