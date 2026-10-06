@@ -1631,6 +1631,8 @@ Il2Cpp.perform(() => {
 		", method.implementation " + (implHookOK ? "yes" : "NO"));
 	const pluginList: Plugin[] = [];
 	let pluginDir = "", pluginsScanned = false, pluginScanPending = false;
+	const hostPlugins: { [key: string]: string } = (globalThis as any).__universalimguiPluginFiles || {};
+	const hostPluginMode = Object.keys(hostPlugins).length > 0;
 
 	function libc(name: string, ret: string, args: string[]): any {
 		const p = Module.findGlobalExportByName(name);
@@ -1755,10 +1757,10 @@ Il2Cpp.perform(() => {
 	}
 	function scanPlugins(): number {
 		if (!pluginDir) return 0;
-		if (c_mkdir) try { c_mkdir(Memory.allocUtf8String(pluginDir), 0o771); } catch {}
-		let files = listJs(pluginDir);
+		if (!hostPluginMode && c_mkdir) try { c_mkdir(Memory.allocUtf8String(pluginDir), 0o771); } catch {}
+		let files = hostPluginMode ? Object.keys(hostPlugins).filter(f => /\.js$/i.test(f)).sort() : listJs(pluginDir);
 		if (files === null) { log("plugins: can't read " + pluginDir); return 0; }
-		if (files.length === 0 && !pluginsScanned) {
+		if (files.length === 0 && !pluginsScanned && !hostPluginMode) {
 			try { (File as any).writeAllText(pluginDir + "/example_plugin.js", EXAMPLE_PLUGIN); files = ["example_plugin.js"]; }
 			catch (e) { log("plugins: couldn't write the example: " + e); }
 		}
@@ -1776,7 +1778,7 @@ Il2Cpp.perform(() => {
 		}
 		for (const f of files) {
 			let code = "";
-			try { code = (File as any).readAllText(pluginDir + "/" + f); }
+			try { code = hostPluginMode ? String(hostPlugins[f] ?? "") : (File as any).readAllText(pluginDir + "/" + f); }
 			catch (e) {
 				if (!pluginList.some(p => p.file === f))
 					pluginList.push({ name: f, file: f, builtin: false, status: "can't read: " + e, logs: [], draw: null, frame: null, fails: 0 });
@@ -1908,11 +1910,11 @@ Il2Cpp.perform(() => {
 	}
 	function pluginsTab() {
 		const list = filePlugins();
-		text("Folder: " + (pluginDir || "resolving..."), C.TextDisabled);
-		if (button("Load New Plugins")) { requestScan(); notify("Scanning plugins folder"); }
+		text(hostPluginMode ? "PC Plugins: loaded by Frida bridge" : "Folder: " + (pluginDir || "resolving..."), C.TextDisabled);
+		if (button("Load New Plugins")) { requestScan(); notify(hostPluginMode ? "PC plugin bundle is fixed until Frida restarts" : "Scanning plugins folder"); }
 		sameLine(); if (button("All On")) for (const pl of list) setPlugin(pl, true);
 		sameLine(); if (button("All Off")) for (const pl of list) setPlugin(pl, false);
-		if (!list.length) text("No plugins yet - put .js files in the folder above, then Load New Plugins.", C.TextDisabled);
+		if (!list.length) text(hostPluginMode ? "No PC plugins found. Put .js files in the PC plugins folder and restart the launcher." : "No plugins yet - put .js files in the folder above, then Load New Plugins.", C.TextDisabled);
 		for (const pl of list) {
 			const on = !!pl.enabled;
 			const tag = pl.status.startsWith("error") ? "   [ERROR]" : on ? "   [ON]" : "   [OFF]";
