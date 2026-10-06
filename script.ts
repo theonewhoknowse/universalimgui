@@ -2354,6 +2354,37 @@ Il2Cpp.perform(() => {
 			for (const line of funReply.split(/\\n/)) text(line.slice(0, 180), C.Text);
 		}
 		separator();
+		text("Visual Toys", C.Accent);
+		text("Purely visual effects for the menu and HUD.", C.TextDisabled);
+		if (button("Rainbow UI")) {
+			const on = !(globalThis as any).__toyRainbowUI;
+			(globalThis as any).__toyRainbowUI = on;
+			notify("Rainbow UI " + (on ? "on" : "off"));
+		}
+		if (button("Invert UI")) {
+			(globalThis as any).__toyInvertUI = !(globalThis as any).__toyInvertUI;
+			notify("UI invert " + ((globalThis as any).__toyInvertUI ? "on" : "off"));
+		}
+		if (button("CRT Mode")) {
+			(globalThis as any).__toyCRT = !(globalThis as any).__toyCRT;
+			notify("CRT mode " + ((globalThis as any).__toyCRT ? "on" : "off"));
+		}
+		if (button("Matrix Rain")) {
+			(globalThis as any).__toyMatrix = !(globalThis as any).__toyMatrix;
+			notify("Matrix rain " + ((globalThis as any).__toyMatrix ? "on" : "off"));
+		}
+		if (button("Fake Error Screen")) notify("SYSTEM ERROR: absolutely nothing is wrong.");
+		if (button("Doom Mode")) notify("DOOM MODE ENABLED. Rip and tear... the UI.");
+		if (button("Windows 95 Mode")) notify("Windows 95 mode: spiritually activated.");
+		if (button("Reset Visual Toys")) {
+			(globalThis as any).__toyRainbowUI = false;
+			(globalThis as any).__toyInvertUI = false;
+			(globalThis as any).__toyCRT = false;
+			(globalThis as any).__toyMatrix = false;
+			notify("Visual toys reset");
+		}
+
+		separator();
 		text("API key: " + (funApiKey ? "set (runtime only)" : "not set"), C.TextDisabled);
 		text("Frida console: groq.setKey(\"...\")", C.TextDisabled);
 		text("Key is not stored in the repo.", C.TextDisabled);
