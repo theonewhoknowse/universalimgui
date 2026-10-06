@@ -6,7 +6,7 @@ declare const console: any;
 const NOTE_FOR_GPT   = "thank you for editing this menu for me";
 const CREDITS        = "by pepperoni, astraeus, and x3non";
 const MENU_TITLE     = "universal imgui";
-const DISCORD_URL    = "blank";
+const DISCORD_URL    = "";
 const MENU_VERSION   = "v1.0";
 const MENU_HOLD_X    = false;
 const SHOW_LASER     = true;
@@ -1494,6 +1494,7 @@ Il2Cpp.perform(() => {
 		gap: (px: number = 8) => { hudY += px; },
 	};
 	function notify(s: string, secs: number = 4) {
+		s = String(s).replace(/\s+/g, " ").slice(0, 180);
 		notes.push({ s, until: Date.now() + secs * 1000 });
 		while (notes.length > 5) notes.shift();
 		hudContentAt = 0;
@@ -1755,7 +1756,7 @@ Il2Cpp.perform(() => {
 		}
 		for (const pl of pluginList) {
 			if (!pl.frame || pl.enabled === false) continue;
-			try { pl.frame(); pl.fails = 0; }
+			try { withOwner(pl, () => pl.frame!()); pl.fails = 0; }
 			catch (e) { errOnce(pl.name + " onFrame", e); if (++pl.fails >= 3) { pl.frame = null; pl.status = "onFrame switched off: " + e; } }
 		}
 	}
@@ -1826,7 +1827,7 @@ Il2Cpp.perform(() => {
 	function pluginPage(pl: Plugin) {
 		if (pl.props && pl.props.length) drawProps(pl);
 		if (pl.draw) {
-			try { pl.draw(ui); }
+			try { withOwner(pl, () => pl.draw!(ui)); }
 			catch (e) { pl.draw = null; pl.status = "tab switched off: " + e; notify(pl.name + ": tab error"); }
 		} else if (!(pl.props && pl.props.length)) text(pl.status === "loaded" ? "(this plugin has no tab UI - it just runs)" : pl.status, C.TextDisabled);
 		separator();
@@ -1856,7 +1857,7 @@ Il2Cpp.perform(() => {
 			if (on) {
 				if (pl.props && pl.props.length) drawProps(pl);
 				if (pl.draw) {
-					try { pl.draw(ui); }
+					try { withOwner(pl, () => pl.draw!(ui)); }
 					catch (e) { pl.draw = null; pl.status = "settings switched off: " + e; notify(pl.name + ": settings error"); }
 				} else if (!(pl.props && pl.props.length) && pl.status.startsWith("loaded")) text("(no settings - it just runs)", C.TextDisabled);
 			}
@@ -1890,11 +1891,14 @@ Il2Cpp.perform(() => {
 	function settings() {
 		if (sliderInt("Menu Size %", setSize, 40, 300)) setMenuScale(UI_SCALE * setSize.v / 100);
 		if (sliderInt("Menu Width", setWidth, 600, 1400)) style.width = setWidth.v;
-		if (combo("Menu Position", setWrist, ["Wrist (hold X)", "Floating"])) { style.wrist = setWrist.v === 0; for (const w of wins.values()) place(w); }
+		if (combo("Menu Position", setWrist, ["Wrist", "Floating"])) { style.wrist = setWrist.v === 0; for (const w of wins.values()) place(w); }
 		if (combo("Tab Height", setTabH, ["Fixed (scrolls)", "Match Settings", "Fit Content"])) style.pageMode = setTabH.v;
 		if (style.pageMode === 0 && sliderInt("Page Height", setPageH, 120, 900)) style.pageH = setPageH.v;
-		checkbox("Always On Top", setOnTop, "hands never hide the menu");
-		checkbox("Stabilize", setStab, "no wrist / pointer shake");
+		if (checkbox("Always On Top", setOnTop, "hands never hide the menu")) style.onTop = setOnTop.v;
+		if (checkbox("Stabilize", setStab, "no wrist / pointer shake")) {
+			style.stabilize = setStab.v;
+			wristPosF.reset(); wristDirF.reset(); rayPosF.reset(); rayDirF.reset();
+		}
 		if (sliderFloat("Menu Opacity", setOpacity, 0.2, 1)) style.opacity = setOpacity.v;
 		if (sliderInt("Rounding", setRounding, 0, 14)) style.rounding = setRounding.v;
 		if (combo("Theme", setTheme, THEME_NAMES)) applyTheme(THEME_NAMES[setTheme.v]);
@@ -2124,9 +2128,16 @@ Il2Cpp.perform(() => {
 	let lastAssetCheck = 0;
 	function rebuildShapes() {
 		log("menu assets were freed (scene load) - rebuilding");
+		// Protected meshes/materials do not get reclaimed by Resources.UnloadUnusedAssets,
+		// so explicitly release our old generated assets before rebuilding them.
+		for (const m of meshCache.values()) { try { destroy(m); } catch {} }
+		for (const w of wins.values()) {
+			if (w.pattern?.pmesh) { try { destroy(w.pattern.pmesh); } catch {} }
+			for (const pool of w.rpool ?? []) for (const e of pool) if (e?.owned) { try { destroy(e.owned); } catch {} }
+		}
+		meshCache.clear();
 		shapesTried = false; roundOK = false; meshMode = "";
 		circleTex = ringTex = unitMesh = uiMat = topMat = null;
-		meshCache.clear();
 		for (const w of wins.values()) {
 			if (w.root) { try { destroy(w.root); } catch {} }
 			w.root = w.rootT = w.canvas = w.canvasT = w.pattern = null;
@@ -2637,7 +2648,15 @@ Il2Cpp.perform(() => {
 		} else if (gestureAvail) {
 			menuOpen = gestureOpen || menuForced;
 		}
-		if (menuOpen && !wasOpen) { wristPosF.reset(); wristDirF.reset(); rayPosF.reset(); rayDirF.reset(); }
+		if (menuOpen && !wasOpen) {
+			triggerSeen = false;
+			dwell = { x: -1, y: -1, t: 0, fired: false };
+			wristPosF.reset(); wristDirF.reset(); rayPosF.reset(); rayDirF.reset();
+		}
+		if (!menuOpen && wasOpen) {
+			triggerSeen = false;
+			dwell = { x: -1, y: -1, t: 0, fired: false };
+		}
 		wasOpen = menuOpen;
 
 		pointerMode = choosePointer();
