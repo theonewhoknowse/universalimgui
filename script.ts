@@ -982,7 +982,7 @@ Il2Cpp.perform(() => {
 		if (!io.open) { activeId = ""; activeWin = null; dragWin = null; openPopup = null; }
 		if (io.justOpened) for (const w of wins.values()) if (w.placed && !isWrist(w) && outOfView(w)) place(w);
 
-		if (dragWin && io.down) {
+		if (dragWin && io.down && io.hasRay) {
 			const hit = add(io.rayO, mul(io.rayD, dragT));
 			const hp = headPose();
 			if (hp) faceAt(dragWin, hit, hp.p);
