@@ -39,7 +39,8 @@ const EXTRA_FRAME_HOOKS = ["HurricaneVR.Framework.Core.Player.HVRPlayerControlle
 	"UnityEngine.SpatialTracking.TrackedPoseDriver", "UnityEngine.InputSystem.XR.TrackedPoseDriver", "Valve.VR.SteamVR_Behaviour_Pose",
 	"UnityEngine.EventSystems.EventSystem"];
 const POINTER_MODE   = "auto";
-const OPEN_GESTURE   = false;
+const OPEN_GESTURE   = true;
+const WRIST_OPEN_HOLD = 1.5;
 const POKE_REACH     = 0.07;
 
 const CONTROLLER_COMPONENTS = [
@@ -3120,24 +3121,13 @@ Il2Cpp.perform(() => {
 		const hp = headPose(), lp = leftT ? posOf(leftT) : null;
 		if (!hp || !lp) { gestureOn = false; gestureT = 0; return false; }
 		const d = sub(lp, hp.p), dist = len(d), c = dot(norm(d), norm(hp.f));
-		if (!gestureOn) { gestureT = c > 0.9 && dist < 0.65 ? gestureT + dt : 0; if (gestureT > 0.35) { gestureOn = true; gestureT = 0; } }
+		if (!gestureOn) { gestureT = c > 0.9 && dist < 0.65 ? gestureT + dt : 0; if (gestureT > WRIST_OPEN_HOLD) { gestureOn = true; gestureT = 0; } }
 		else { gestureT = c < 0.45 || dist > 0.9 ? gestureT + dt : 0; if (gestureT > 0.5) { gestureOn = false; gestureT = 0; } }
 		return gestureOn;
 	}
 	function readYButton(): { pressed: boolean; srcs: string[] } {
-		const srcs: string[] = [];
-		let pressed = false;
-		// Quest: Y is the left controller's secondary face button.
-		// Do not treat X, A, B, menu, or a wrist gesture as menu input.
-		if (xrReady) {
-			srcs.push("XR Y");
-			if (xrButton(4, usageSecBtn)) pressed = true;
-		}
-		if (hvrReady()) {
-			srcs.push("HurricaneVR Y");
-			try { if (hvrRead(hvr.left, "SecondaryButton", "bool")) pressed = true; } catch {}
-		}
-		return { pressed, srcs };
+		// Menu opening is gesture-only. Controller face buttons are ignored.
+		return { pressed: false, srcs: [] };
 	}
 
 	function choosePointer(): string {
@@ -3453,7 +3443,7 @@ Il2Cpp.perform(() => {
 	log("frame hooks: " + [ovrUpdate ? "OVRCameraRig." + ovrUpdate.name : "", canvasHooked ? "Canvas.SendWillRenderCanvases" : "", backupSrc ? backupSrc + " (backup)" : ""].filter(s => s).join(" + ") + " | late anchoring: " + lateSrc);
 	log("input: " + (ovr.btn ? "OVRInput X" : legacyGetKey ? "Unity input (X = joystick button 2)" : "menu()") +
 		(ovr.axis ? " + trigger" : "") + (ovr.stick ? " + stick scroll" : "") + " | pointer: " + POINTER_MODE + " (auto picks ray / poke / gaze)");
-	log("ready - rig is detected on the first frames; press Y to open");
+	log("ready - hold your left wrist out for 1.5s to open");
 
 	function compatReport(): string {
 		const has = (asm: string, cls: string) => { try { const a = Il2Cpp.domain.tryAssembly(asm); return !!(a && a.image.tryClass(cls)); } catch { return false; } };
