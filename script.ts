@@ -664,6 +664,18 @@ Il2Cpp.perform(() => {
 			return !!ok && out.readU8() !== 0;
 		} catch { return false; }
 	}
+	function xrFloat(node: number, usage: any): number | null {
+		if (!xrReady || !usage) return null;
+		try {
+			const dev = xrDevice(node);
+			if (!dev) return null;
+			const m = dev.method ? dev.method("TryGetFeatureValue", 2) : null;
+			if (!m) return null;
+			const out = Memory.alloc(4);
+			if (!m.invoke(usage, out)) return null;
+			return out.readFloat();
+		} catch { return null; }
+	}
 	function legacyKey(code: number): boolean {
 		if (!legacyGetKey || legacyOK === false) return false;
 		try { const v = !!legacyGetKey.invoke(code); legacyOK = true; return v; }
@@ -961,7 +973,8 @@ Il2Cpp.perform(() => {
 		io.open = inp.open;
 		io.hasRay = !!(inp.rayO && inp.rayD);
 		if (inp.rayO && inp.rayD) { io.rayO = inp.rayO; io.rayD = norm(inp.rayD); }
-		const down = inp.down && io.hasRay && io.open;
+		const physicalDown = inp.down && io.open;
+		const down = physicalDown;
 		io.pressed = down && !io.down;
 		io.released = !down && io.down;
 		io.down = down;
@@ -1978,6 +1991,7 @@ Il2Cpp.perform(() => {
 		text("Frame hook: " + driverSrc + " | head: " + (rig.headSrc || "not found"), rig.head ? C.Text : bad);
 		text("Hands: " + (rig.left ? rig.handSrc : "not found (retrying)"), rig.left ? C.Text : bad);
 		text("Open: " + openSrc + " | pointer: " + pointerMode, C.Text);
+		text("Trigger: " + triggerSource + (triggerInputAvailable ? " | ready" : " | fallback"), C.TextDisabled);
 		text("Background: " + (patternTex ? "pattern ok" : patternTried ? "pattern unavailable" : "-"), C.TextDisabled);
 		text("Renderer: canvas " + rectMode + (roundOK ? ", rounded (" + meshCache.size + " meshes, " + meshMode + ")" : "") + (topMat ? ", on-top ok" : ""), C.TextDisabled);
 		text("Stabilizer: " + (lateActive() ? "render-time anchoring" : "update-time anchoring") + (style.stabilize ? " + jitter filter" : ""), C.TextDisabled);
@@ -2582,7 +2596,7 @@ Il2Cpp.perform(() => {
 		renderHud(hudContent);
 		syncLaser();
 		budgetHit = budget <= 0;
-		if (!io.down) { activeId = ""; activeWin = null; dragWin = null; }
+		if (!io.down) { activeId = ""; activeWin = null; dragWin = null; resizeStart = null; scrollDrag = null; }
 	}
 	function renderLight(hudContent: boolean) {
 		budget = CREATE_BUDGET;
@@ -2643,15 +2657,37 @@ Il2Cpp.perform(() => {
 		if (rightT) return "ray";
 		return "gaze";
 	}
+	let triggerLatched = false, triggerInputAvailable = false, triggerSource = "none";
 	function anyClick(): boolean {
-		if (xrReady && (xrButton(5, usageTrigBtn) || xrButton(5, usagePrimBtn))) return true;
-		if (ovr.axis && ovrRightTrigger() > TRIG_THRESH) return true;
-		if (hvr.inputs && hvrTrigger() > TRIG_THRESH) return true;
-		if (legacyGetAxis && legacyTrigger() > TRIG_THRESH) return true;
-		if (legacyOK !== false && legacyGetKey) {
-			if (legacyKey(KEY_A) || legacyKey(0) || legacyKey(14) || legacyKey(15) || legacyKey(4) || legacyKey(5)) return true;
+		let value = 0, available = false, source = "none";
+		if (xrReady) {
+			if (usageTrigBtn && xrButton(5, usageTrigBtn)) { value = 1; available = true; source = "XR triggerButton"; }
+			else {
+				const xf = xrFloat(5, usageTrig);
+				if (xf !== null) { value = xf; available = true; source = "XR trigger"; }
+			}
 		}
-		return false;
+		if (!available && ovr.axis) {
+			try { value = ovrRightTrigger(); available = true; source = "OVRInput"; } catch {}
+		}
+		if (!available && hvr.inputs) {
+			try { value = hvrTrigger(); available = true; source = "HurricaneVR"; } catch {}
+		}
+		if (!available && legacyGetAxis) {
+			try { value = legacyTrigger(); available = legacyAxisOK !== false; source = "Unity axis"; } catch {}
+		}
+		if (!available && legacyOK !== false && legacyGetKey) {
+			try {
+				available = true; source = "Unity key fallback";
+				value = (legacyKey(KEY_A) || legacyKey(0) || legacyKey(14) || legacyKey(15) || legacyKey(4) || legacyKey(5)) ? 1 : 0;
+			} catch {}
+		}
+		triggerInputAvailable = available;
+		triggerSource = source;
+		const releaseThreshold = Math.max(0.08, TRIG_THRESH * 0.62);
+		if (triggerLatched) triggerLatched = value > releaseThreshold;
+		else triggerLatched = value > TRIG_THRESH;
+		return triggerLatched;
 	}
 	let dwell = { x: -1, y: -1, t: 0, fired: false };
 	function pokeRay(): { o: number[]; d: number[]; down: boolean } | null {
@@ -2741,7 +2777,7 @@ Il2Cpp.perform(() => {
 					}
 					down = anyClick();
 					if (down) triggerSeen = true;
-					if (!triggerSeen && rightT) { const pr = pokeRay(); if (pr && pr.down) down = true; }
+					if (!triggerInputAvailable && rightT) { const pr = pokeRay(); if (pr && pr.down) io.down = true; }
 				} else if (pointerMode === "poke" && rightT) {
 					const pr = pokeRay();
 					if (pr) { rayO = pr.o; rayD = pr.d; down = pr.down; }
