@@ -39,7 +39,7 @@ const EXTRA_FRAME_HOOKS = ["HurricaneVR.Framework.Core.Player.HVRPlayerControlle
 	"UnityEngine.SpatialTracking.TrackedPoseDriver", "UnityEngine.InputSystem.XR.TrackedPoseDriver", "Valve.VR.SteamVR_Behaviour_Pose",
 	"UnityEngine.EventSystems.EventSystem"];
 const POINTER_MODE   = "auto";
-const OPEN_GESTURE   = true;
+const OPEN_GESTURE   = false;
 const POKE_REACH     = 0.07;
 
 const CONTROLLER_COMPONENTS = [
@@ -2833,9 +2833,9 @@ Il2Cpp.perform(() => {
 		})() : "none (anchored every frame instead)";
 
 	log("frame hooks: " + [ovrUpdate ? "OVRCameraRig." + ovrUpdate.name : "", canvasHooked ? "Canvas.SendWillRenderCanvases" : "", backupSrc ? backupSrc + " (backup)" : ""].filter(s => s).join(" + ") + " | late anchoring: " + lateSrc);
-	log("input: " + (ovr.btn ? "OVRInput X" : legacyGetKey ? "Unity input (X = joystick button 2) / wrist gesture" : "wrist gesture / menu()") +
+	log("input: " + (ovr.btn ? "OVRInput X" : legacyGetKey ? "Unity input (X = joystick button 2)" : "menu()") +
 		(ovr.axis ? " + trigger" : "") + (ovr.stick ? " + stick scroll" : "") + " | pointer: " + POINTER_MODE + " (auto picks ray / poke / gaze)");
-	log("ready - rig is detected on the first frames; hold X (or look at your left wrist) to open");
+	log("ready - rig is detected on the first frames; press X to open");
 
 	function compatReport(): string {
 		const has = (asm: string, cls: string) => { try { const a = Il2Cpp.domain.tryAssembly(asm); return !!(a && a.image.tryClass(cls)); } catch { return false; } };
