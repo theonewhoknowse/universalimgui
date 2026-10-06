@@ -1420,7 +1420,8 @@ Il2Cpp.perform(() => {
 		const tid = bar.id + "/" + label;
 		if (!tabSel.has(bar.id)) tabSel.set(bar.id, tid);
 		const n = tabCount.get(bar.id) ?? 0, gap = 3;
-		const tw = style.tabsFill && n > 0 ? (fullW() - gap * (n - 1)) / n : textW(disp) + style.framePadX * 2;
+		const knownCount = tabCount.has(bar.id);
+		const tw = style.tabsFill && knownCount && n > 0 ? (fullW() - gap * (n - 1)) / n : textW(disp) + style.framePadX * 2;
 		const x = bar.nx;
 		bar.nx += tw + gap; bar.n++;
 		const win = cur!, clip = win.clipOn;
@@ -2582,7 +2583,7 @@ Il2Cpp.perform(() => {
 		return "gaze";
 	}
 	function anyClick(): boolean {
-		if (xrReady && (xrButton(5, usageTrigBtn) || xrButton(5, usagePrimBtn) || xrButton(4, usagePrimBtn))) return true;
+		if (xrReady && (xrButton(5, usageTrigBtn) || xrButton(5, usagePrimBtn))) return true;
 		if (ovr.axis && ovrRightTrigger() > TRIG_THRESH) return true;
 		if (hvr.inputs && hvrTrigger() > TRIG_THRESH) return true;
 		if (legacyGetAxis && legacyTrigger() > TRIG_THRESH) return true;
