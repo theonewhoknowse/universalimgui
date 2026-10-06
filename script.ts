@@ -77,6 +77,8 @@ function drawMenu(ui: any): void {
 	if (ui.begin(MENU_TITLE)) {
 		ui.beginTabBar("tabs");
 		if (ui.tabItem("Main")) {
+			ui.text("R Trigger: " + (triggerInputAvailable ? (triggerLatched ? "PRESSED" : "released") : "NO INPUT") + "  " + (triggerSource === "none" ? "" : "[" + triggerSource + "]"));
+			ui.text("R Trigger value: " + triggerDebugValue.toFixed(2));
 			if (ui.checkbox("Example Toggle", S.exampleToggle, "Description shows next to the tick"))
 				ui.notify("Example Toggle " + (S.exampleToggle.v ? "on" : "off"));
 			ui.sliderFloat("Speed", S.speed, 0, 10);
@@ -3135,7 +3137,7 @@ Il2Cpp.perform(() => {
 		if (rightT) return "ray";
 		return "gaze";
 	}
-	let triggerLatched = false, triggerInputAvailable = false, triggerSource = "none";
+	let triggerLatched = false, triggerInputAvailable = false, triggerSource = "none", triggerDebugValue = 0;
 	function anyClick(): boolean {
 		let value = 0, available = false, source = "none";
 		if (xrReady) {
@@ -3165,6 +3167,7 @@ Il2Cpp.perform(() => {
 		}
 		triggerInputAvailable = available;
 		triggerSource = source;
+		triggerDebugValue = value;
 		const releaseThreshold = Math.max(0.08, TRIG_THRESH * 0.62);
 		if (triggerLatched) triggerLatched = value > releaseThreshold;
 		else triggerLatched = value > TRIG_THRESH;
