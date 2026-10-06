@@ -94,6 +94,7 @@ function drawMenu(ui: any): void {
 			ui.text("Add as many tabs as you like - the strip splits the width evenly.");
 		}
 		if (ui.tabItem("Fun")) ui.fun();
+		if (ui.tabItem("Toys")) ui.toys();
 		if (ui.tabItem("Plugins")) ui.pluginsTab();
 		if (ui.tabItem("Info")) ui.info();
 		if (ui.tabItem("Debug")) ui.debug();
@@ -177,6 +178,9 @@ Il2Cpp.perform(() => {
 	const UIText       = need(asmUI,   "UnityEngine.UI.Text");
 	const Font         = need(asmText, "UnityEngine.Font");
 	const Camera       = asmCore.tryClass("UnityEngine.Camera");
+	const TimeCls      = asmCore.tryClass("UnityEngine.Time");
+	const PhysicsCls   = asmPhys ? asmPhys.tryClass("UnityEngine.Physics") : null;
+	const RigidbodyCls = asmPhys ? asmPhys.tryClass("UnityEngine.Rigidbody") : null;
 	const TouchKeyboard = asmCore.tryClass("UnityEngine.TouchScreenKeyboard");
 	const UnityWebRequest = asmNet ? asmNet.tryClass("UnityEngine.Networking.UnityWebRequest") : null;
 
@@ -2059,6 +2063,213 @@ Il2Cpp.perform(() => {
 	let funApiKey = "";
 	let funModel = "llama-3.3-70b-versatile";
 
+
+	let toyTimeScale = ref(1.0);
+	let toyGravity = ref(9.81);
+	let toyRigScale = ref(1.0);
+	let toyRainbow = ref(false);
+	let toyRainbowAt = 0;
+	let toyRainbowMats: { mat: any; color: number[] }[] = [];
+	let toySpawned: any[] = [];
+	let toyFpsHistory: number[] = [];
+	let toyLastFixedDelta = 0.02;
+
+	function toyStaticFloat(cls: any, getter: string, value: number | null = null): number | null {
+		if (!cls) return null;
+		try {
+			const m = cls.method(value === null ? getter : ("set_" + getter.replace(/^get_/, "")), value === null ? 0 : 1);
+			if (value === null) return Number(m.invoke());
+			m.invoke(value);
+			return value;
+		} catch { return null; }
+	}
+
+	function toyApplyTimeScale(v: number) {
+		v = Math.max(0.05, Math.min(4, +v || 1));
+		toyTimeScale.v = v;
+		if (!TimeCls) return false;
+		try {
+			TimeCls.method("set_timeScale", 1).invoke(v);
+			const fixed = TimeCls.method("get_fixedDeltaTime", 0).invoke();
+			if (!toyLastFixedDelta || toyLastFixedDelta <= 0) toyLastFixedDelta = Number(fixed) / Math.max(0.05, v);
+			TimeCls.method("set_fixedDeltaTime", 1).invoke(toyLastFixedDelta * v);
+			return true;
+		} catch (e) { errOnce("game toy timeScale", e); return false; }
+	}
+
+	function toyReadGravity(): number {
+		if (!PhysicsCls) return toyGravity.v;
+		try {
+			const g = PhysicsCls.method("get_gravity", 0).invoke();
+			return xyz(g)[1];
+		} catch { return toyGravity.v; }
+	}
+
+	function toyApplyGravity(y: number) {
+		y = Math.max(-30, Math.min(30, +y || 0));
+		toyGravity.v = y;
+		if (!PhysicsCls) return false;
+		try {
+			PhysicsCls.method("set_gravity", 1).invoke(v3(0, y, 0));
+			return true;
+		} catch (e) { errOnce("game toy gravity", e); return false; }
+	}
+
+	function toyRestore() {
+		toyApplyTimeScale(1);
+		toyApplyGravity(-9.81);
+		toyRigScale.v = 1;
+		if (rig.head) call(rig.head, "set_localScale", v3(1, 1, 1));
+		if (leftT) call(leftT, "set_localScale", v3(1, 1, 1));
+		if (rightT) call(rightT, "set_localScale", v3(1, 1, 1));
+		toyRainbow.v = false;
+		for (const x of toyRainbowMats) {
+			try { call(x.mat, "set_color", col(x.color)); } catch {}
+		}
+		toyRainbowMats.length = 0;
+		for (const go of toySpawned) destroy(go);
+		toySpawned.length = 0;
+		notify("Game toys reset");
+	}
+
+	function toySetRigScale(v: number) {
+		v = Math.max(0.5, Math.min(2.5, +v || 1));
+		toyRigScale.v = v;
+		for (const t of [rig.head, leftT, rightT]) if (t) call(t, "set_localScale", v3(v, v, v));
+	}
+
+	function toySpawnCube(launch: boolean = false) {
+		const originT = rightT || headT();
+		if (!originT) { notify("No hand/head found"); return; }
+		const p = get3(originT, "get_position"), f = get3(originT, "get_forward");
+		if (!p || !f) { notify("Couldn't read spawn pose"); return; }
+		try {
+			const go = keep(GameObject.method("CreatePrimitive", 3).invoke(3));
+			const t = keep(go.method("get_transform", 0).invoke());
+			call(t, "set_position", v3(p[0] + f[0] * 0.25, p[1] + f[1] * 0.25, p[2] + f[2] * 0.25));
+			call(t, "set_localScale", v3(0.12, 0.12, 0.12));
+			if (RigidbodyCls) {
+				const rb = addComp(go, RigidbodyCls);
+				if (rb) {
+					try { call(rb, "set_mass", 1); } catch {}
+					if (launch) call(rb, "set_velocity", v3(f[0] * 8, f[1] * 8, f[2] * 8));
+				}
+			}
+			toySpawned.push(go);
+			while (toySpawned.length > 32) destroy(toySpawned.shift());
+			notify(launch ? "Launched cube" : "Spawned cube");
+		} catch (e) { errOnce("game toy spawn cube", e); notify("Couldn't spawn cube"); }
+	}
+
+	function toyExplode() {
+		if (!RigidbodyCls || !PhysicsCls) { notify("Physics API unavailable"); return; }
+		const t = headT(), p = t ? get3(t, "get_position") : null;
+		if (!p) { notify("No head pose"); return; }
+		let n = 0;
+		try {
+			for (const rb of objectsOf(RigidbodyCls)) {
+				try {
+					const m = rb.method("AddExplosionForce", 4);
+					m.invoke(650, v3(p[0], p[1], p[2]), 6, 1.5);
+					n++;
+				} catch {}
+			}
+		} catch (e) { errOnce("game toy explosion", e); }
+		notify("Physics blast: " + n + " rigidbodies");
+	}
+
+	function toyScanRainbow() {
+		if (!Renderer || toyRainbowMats.length) return;
+		let n = 0;
+		try {
+			for (const ren of objectsOf(Renderer)) {
+				if (n >= 160) break;
+				try {
+					const mat = call(ren, "get_material");
+					if (!mat || mat.isNull()) continue;
+					const c = call(mat, "get_color");
+					const original = [c.handle.readFloat(), c.handle.add(4).readFloat(), c.handle.add(8).readFloat(), c.handle.add(12).readFloat()];
+					toyRainbowMats.push({ mat: keep(mat), color: original });
+					n++;
+				} catch {}
+			}
+		} catch (e) { errOnce("game toy rainbow scan", e); }
+	}
+
+	function toyUpdateRainbow() {
+		if (!toyRainbow.v) return;
+		const now = Date.now();
+		if (now - toyRainbowAt < 90) return;
+		toyRainbowAt = now;
+		if (!toyRainbowMats.length) toyScanRainbow();
+		const phase = now * 0.002;
+		for (let i = 0; i < toyRainbowMats.length; i++) {
+			const h = (phase + i * 0.17) % (Math.PI * 2);
+			const r = 0.5 + 0.5 * Math.sin(h);
+			const g = 0.5 + 0.5 * Math.sin(h + 2.094);
+			const b = 0.5 + 0.5 * Math.sin(h + 4.188);
+			try { call(toyRainbowMats[i].mat, "set_color", col([r, g, b, toyRainbowMats[i].color[3]])); } catch {}
+		}
+	}
+
+	function toyRandomEvent() {
+		const pick = Math.floor(Math.random() * 6);
+		if (pick === 0) { toyApplyTimeScale([0.25, 0.5, 1.5, 2.5][Math.floor(Math.random() * 4)]); notify("Random event: time warp"); }
+		else if (pick === 1) { toyApplyGravity([0, -2, -30, 3, 9.81][Math.floor(Math.random() * 5)]); notify("Random event: gravity roulette"); }
+		else if (pick === 2) { toySpawnCube(true); }
+		else if (pick === 3) { toyRainbow.v = !toyRainbow.v; if (toyRainbow.v) toyScanRainbow(); notify("Random event: rainbow world"); }
+		else if (pick === 4) { toyExplode(); }
+		else { toySetRigScale([0.65, 1.5, 2.0][Math.floor(Math.random() * 3)]); notify("Random event: rig size"); }
+	}
+
+	function toyUpdate() {
+		toyUpdateRainbow();
+		const f = Math.max(0, Math.min(240, fps));
+		toyFpsHistory.push(f);
+		while (toyFpsHistory.length > 24) toyFpsHistory.shift();
+	}
+
+	function toysTab() {
+		text("Universal Game Toys", C.Accent);
+		text("Generic Unity toys. Effects depend on what the game exposes.", C.TextDisabled);
+		separator();
+
+		if (sliderFloat("Time Scale", toyTimeScale, 0.05, 4, 2)) toyApplyTimeScale(toyTimeScale.v);
+		if (button("Normal Time")) toyApplyTimeScale(1);
+		if (sliderFloat("Gravity Y", toyGravity, -30, 30, 1)) toyApplyGravity(toyGravity.v);
+		sameLine();
+		if (button("Low Gravity")) toyApplyGravity(-1.5);
+		sameLine();
+		if (button("Zero Gravity")) toyApplyGravity(0);
+
+		if (sliderFloat("Rig Scale", toyRigScale, 0.5, 2.5, 2)) toySetRigScale(toyRigScale.v);
+		if (button("Spawn Cube")) toySpawnCube(false);
+		sameLine();
+		if (button("Launch Cube")) toySpawnCube(true);
+		if (button("Physics Explosion")) toyExplode();
+
+		if (checkbox("Rainbow World", toyRainbow, "colors up to 160 renderers")) {
+			if (toyRainbow.v) toyScanRainbow();
+			else {
+				for (const x of toyRainbowMats) try { call(x.mat, "set_color", col(x.color)); } catch {}
+				toyRainbowMats.length = 0;
+			}
+		}
+		if (button("Random Event")) toyRandomEvent();
+		if (button("Reset All Toys")) toyRestore();
+
+		separator();
+		text("FPS toy graph", C.Accent);
+		if (toyFpsHistory.length) {
+			const lo = Math.max(0, Math.min(...toyFpsHistory));
+			const hi = Math.max(1, Math.max(...toyFpsHistory));
+			for (let i = 0; i < toyFpsHistory.length; i++) {
+				const v = (toyFpsHistory[i] - lo) / Math.max(1, hi - lo);
+				progressBar(v, Math.round(toyFpsHistory[i]) + " FPS");
+			}
+		}
+	}
+
 	function funOpenKeyboard() {
 		if (!TouchKeyboard) { notify("TouchScreenKeyboard is unavailable"); return; }
 		try {
@@ -2825,6 +3036,7 @@ Il2Cpp.perform(() => {
 		progressBar, beginTabBar, tabItem, endTabBar, settings, info, notify, confirm, openUrl, style, ref,
 		pluginsTab, plugins: () => filePlugins(), pluginPage,
 		fun: funTab,
+		toys: toysTab,
 		debug: () => {
 			if (button("Print All GameObjects")) debugGameObjects(true);
 			if (button("Print Active GameObjects")) debugGameObjects(false);
@@ -2950,6 +3162,7 @@ Il2Cpp.perform(() => {
 		if (!greeted) { greeted = true; notify(MENU_TITLE + " loaded"); }
 		try { onUpdate(); } catch (e) { errOnce("onUpdate", e); }
 		try { funUpdateKeyboard(); funPollRequest(); } catch (e) { errOnce("fun", e); }
+		try { toyUpdate(); } catch (e) { errOnce("game toys", e); }
 		try { pluginsFrame(); } catch (e) { errOnce("plugins", e); }
 
 		const now = Date.now(), dt = Math.min(0.1, Math.max(0.001, (now - lastTickMs) / 1000));
