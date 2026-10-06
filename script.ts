@@ -714,10 +714,10 @@ Il2Cpp.perform(() => {
 	const THEMES: { [name: string]: { [k: string]: number[] } } = {
 		Crimson: {
 			Text: [1, 0.95, 0.96, 1], TextDisabled: [0.95, 0.7, 0.75, 0.85], TextOnActive: [0.22, 0.02, 0.06, 1],
-			WindowBg: [0.45, 0.08, 0.15, 0.84], Pattern: [1, 0.58, 0.66, 0.34], PopupBg: [0.24, 0.03, 0.08, 0.97], Border: [1, 0.5, 0.6, 0.55],
-			TitleBg: [0.2, 0.02, 0.06, 0.95], TitleBgActive: [0.28, 0.03, 0.08, 0.98],
-			RowBg: [0.12, 0.01, 0.04, 0.42], RowHover: [0.5, 0.07, 0.16, 0.62],
-			FrameBg: [0.1, 0.01, 0.03, 0.72], FrameBgHovered: [0.32, 0.04, 0.1, 0.8], FrameBgActive: [0.5, 0.08, 0.16, 0.9],
+			WindowBg: [0.065, 0.008, 0.018, 0.94], Pattern: [1, 0.34, 0.46, 0.16], PopupBg: [0.055, 0.006, 0.014, 0.985], Border: [1, 0.25, 0.38, 0.48],
+			TitleBg: [0.095, 0.008, 0.022, 0.98], TitleBgActive: [0.18, 0.012, 0.042, 1],
+			RowBg: [0.16, 0.012, 0.035, 0.48], RowHover: [0.42, 0.025, 0.085, 0.72],
+			FrameBg: [0.11, 0.008, 0.025, 0.82], FrameBgHovered: [0.30, 0.018, 0.065, 0.9], FrameBgActive: [0.48, 0.025, 0.10, 0.96],
 			Check: [0.42, 0.98, 0.48, 1], CheckMark: [0.42, 0.98, 0.48, 1],
 			SliderFill: [0.93, 0.32, 0.44, 0.75], SliderFillActive: [1, 0.45, 0.56, 0.95], SliderGrab: [1, 0.6, 0.68, 1], SliderGrabActive: [1, 0.75, 0.8, 1],
 			Button: [0.6, 0.1, 0.2, 0.8], ButtonHovered: [0.85, 0.2, 0.32, 0.95], ButtonActive: [1, 0.32, 0.44, 1],
@@ -745,9 +745,9 @@ Il2Cpp.perform(() => {
 	};
 	const THEME_NAMES = Object.keys(THEMES);
 	const style = {
-		scale: UI_SCALE, width: WINDOW_WIDTH, titleH: 28, pad: 10, spacingX: 8, spacingY: 6,
-		frameH: 28, framePadX: 12, fontSize: 15, grabW: 14,
-		rows: ROW_LAYOUT, rowH: 32, rowGap: 2, labelFrac: 0.42, tabsFill: true, opacity: 1, rounding: ROUNDING,
+		scale: UI_SCALE, width: WINDOW_WIDTH, titleH: 34, pad: 12, spacingX: 9, spacingY: 7,
+		frameH: 30, framePadX: 14, fontSize: 15, grabW: 14,
+		rows: ROW_LAYOUT, rowH: 36, rowGap: 3, labelFrac: 0.44, tabsFill: true, opacity: 1, rounding: ROUNDING,
 		wrist: WRIST_MENU, onTop: ALWAYS_ON_TOP, stabilize: STABILIZE,
 		spin: SPIRAL_SPIN,
 		pageMode: PAGE_HEIGHT > 0 ? 0 : 1, pageH: PAGE_HEIGHT > 0 ? PAGE_HEIGHT : 470,
@@ -1147,9 +1147,10 @@ Il2Cpp.perform(() => {
 		}
 		const focused = mouseWin === w || dragWin === w;
 		RR(0, 0, w.W, th, focused ? C.TitleBgActive : C.TitleBg, L_FRAME, 2, w.collapsed ? ALL_CORNERS : TOP_CORNERS);
+		R(0, th - 2, w.W, 2, focused ? C.Accent : C.TabActive, L_FILL);
 		if (arrow.hov) RR(4, 4, th - 8, th - 8, C.ButtonHovered, L_FILL);
 		T(0, 0, th, th, w.collapsed ? "\u25BA" : "\u25BC", C.Text, ALIGN_CENTER, L_FRAME);
-		T(th, 0, titleW + 8, th, title, C.Text, ALIGN_LEFT, L_FRAME);
+		T(th + 3, 0, titleW + 8, th, title, C.Text, ALIGN_LEFT, L_FRAME);
 		if (MENU_VERSION) T(w.W - closeW - 90, 0, 80, th, MENU_VERSION, C.TextDisabled, ALIGN_RIGHT, L_FRAME);
 
 		w.grip = { hov: false, held: false };
@@ -1180,6 +1181,7 @@ Il2Cpp.perform(() => {
 		const wr = winRadius();
 		R(0, 0, w.W, w.H, fade(C.WindowBg, style.opacity), L_BG, 0, wr);
 		R(0, 0, w.W, w.H, C.Border, L_FILL, 0, wr, ALL_CORNERS, TEX_RING);
+		if (w.H > th) R(2, 2, w.W - 4, w.H - 4, fade(C.Border, 0.28), L_FILL, 0, Math.max(2, wr - 2), ALL_CORNERS, TEX_RING);
 		if (!w.collapsed) {
 			const gc = w.grip.held ? C.GripActive : w.grip.hov ? C.GripHovered : C.Grip;
 			for (let k = 1; k <= 3; k++) line(w.W - 4 - k * 6, w.H - 4, w.W - 4, w.H - 4 - k * 6, 2.5, gc, L_FILL);
@@ -1219,7 +1221,7 @@ Il2Cpp.perform(() => {
 
 	function button(label: string, width?: number): boolean {
 		const [disp, id] = labelId(label);
-		const bw = width ?? textW(disp) + style.framePadX * 2;
+		const bw = Math.min(fullW(), width ?? textW(disp) + style.framePadX * 2);
 		let x: number, y: number, bh: number;
 		if (style.rows) {
 			const joined = cur!.sameLine;
@@ -1234,6 +1236,7 @@ Il2Cpp.perform(() => {
 		}
 		const b = behavior(id, x, y, bw, bh);
 		RR(x, y, bw, bh, b.held ? C.ButtonActive : b.hov ? C.ButtonHovered : C.Button, L_FRAME);
+		if (b.hov || b.held) R(x + 2, y + 2, Math.min(3, bw - 4), bh - 4, b.held ? C.Accent : C.ButtonHovered, L_FILL, 0, 1.5);
 		T(x, y, bw, bh, disp, C.Text, ALIGN_CENTER, L_FRAME);
 		return b.clicked;
 	}
@@ -1244,7 +1247,7 @@ Il2Cpp.perform(() => {
 			const rw = row(id, disp, true);
 			if (rw.b.clicked) r.v = !r.v;
 			const bs = style.frameH - 4, bx = rw.cx, by = rw.y + (rw.h - bs) / 2;
-			RR(bx, by, bs, bs, rw.b.held ? C.FrameBgActive : rw.b.hov ? C.FrameBgHovered : C.FrameBg, L_FRAME, 0.7);
+			RR(bx, by, bs, bs, r.v ? (rw.b.held ? C.SliderFillActive : C.SliderFill) : (rw.b.held ? C.FrameBgActive : rw.b.hov ? C.FrameBgHovered : C.FrameBg), L_FRAME, 0.7);
 			if (r.v) tickMark(bx, by, bs, C.Check);
 			if (desc) T(bx + bs + 10, rw.y, rw.cw - bs - 10, rw.h, desc, C.TextDisabled, ALIGN_LEFT, L_FRAME);
 			return rw.b.clicked;
@@ -1283,7 +1286,14 @@ Il2Cpp.perform(() => {
 		}
 		const f = clamp01((r.v - min) / (max - min || 1));
 		RR(fx, fy, fw, fh, b.held ? C.FrameBgActive : b.hov ? C.FrameBgHovered : C.FrameBg, L_FRAME);
-		RR(fx, fy, fw * f, fh, b.held ? C.SliderFillActive : C.SliderFill, L_FILL);
+		RR(fx, fy, Math.max(fh * 0.45, fw * f), fh, b.held ? C.SliderFillActive : C.SliderFill, L_FILL);
+		const thumbX = fx + clamp01(f) * fw;
+		if (roundOK) {
+			const ts = Math.max(9, fh * 0.78);
+			R(thumbX - ts / 2, fy + (fh - ts) / 2, ts, ts, b.held ? C.SliderGrabActive : C.SliderGrab, L_FILL, 0, ts / 2);
+		} else {
+			R(thumbX - 2, fy + 2, 4, Math.max(1, fh - 4), b.held ? C.SliderGrabActive : C.SliderGrab, L_FILL, 0, 2);
+		}
 		T(fx, fy, fw, fh, fmt(r.v) + (style.rows ? " / " + fmt(max) : ""), C.Text, ALIGN_CENTER, L_FRAME);
 		return changed;
 	}
@@ -1382,6 +1392,7 @@ Il2Cpp.perform(() => {
 		if (b.clicked) openHeaders.set(id, !openHeaders.get(id));
 		const isOpen = !!openHeaders.get(id);
 		RR(x, y, fw, fh, b.held ? C.HeaderActive : b.hov ? C.HeaderHovered : C.Header, L_FRAME);
+		if (isOpen || b.hov) R(x, y + 4, 3, fh - 8, b.held ? C.Accent : C.TabActive, L_FILL, 0, 1.5);
 		T(x, y, fh, fh, isOpen ? "\u25BC" : "\u25BA", C.Text, ALIGN_CENTER, L_FRAME);
 		T(x + fh, y, fw - fh, fh, disp, C.Text, ALIGN_LEFT, L_FRAME);
 		return isOpen;
@@ -1395,7 +1406,9 @@ Il2Cpp.perform(() => {
 		const fw = fullW(), fh = style.frameH;
 		const [x, y] = item(fw, fh);
 		RR(x, y, fw, fh, C.FrameBg, L_FRAME);
-		RR(x, y, fw * clamp01(frac), fh, C.PlotHistogram, L_FILL);
+		const pw = fw * clamp01(frac);
+		if (pw > 0) RR(x, y, pw, fh, C.PlotHistogram, L_FILL);
+		R(x, y, fw, 2, fade(C.Border, 0.35), L_FILL, 0, 1);
 		T(x, y, fw, fh, overlay ?? Math.round(clamp01(frac) * 100) + "%", C.Text, ALIGN_CENTER, L_FRAME);
 	}
 
@@ -1429,7 +1442,8 @@ Il2Cpp.perform(() => {
 		const b = behavior(tid, x, bar.y, tw, bar.h);
 		if (b.clicked) tabNext.set(bar.id, tid);
 		const sel = tabSel.get(bar.id) === tid;
-		RR(x, bar.y, tw, bar.h, sel ? C.TabActive : b.hov ? C.TabHovered : C.Tab, L_FRAME);
+		RR(x, bar.y, tw, bar.h, sel ? C.TabActive : b.hov ? C.TabHovered : C.Tab, L_FRAME, 0.85);
+		if (sel) R(x + 4, bar.y + bar.h - 3, Math.max(1, tw - 8), 3, C.Accent, L_FILL, 0, 1.5);
 		T(x, bar.y, tw, bar.h, disp, sel ? C.TextOnActive : C.Text, ALIGN_CENTER, L_FRAME);
 		win.clipOn = clip;
 		return sel;
