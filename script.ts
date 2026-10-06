@@ -39,7 +39,7 @@ const EXTRA_FRAME_HOOKS = ["HurricaneVR.Framework.Core.Player.HVRPlayerControlle
 	"UnityEngine.SpatialTracking.TrackedPoseDriver", "UnityEngine.InputSystem.XR.TrackedPoseDriver", "Valve.VR.SteamVR_Behaviour_Pose",
 	"UnityEngine.EventSystems.EventSystem"];
 const POINTER_MODE   = "auto";
-const OPEN_GESTURE   = false;
+const OPEN_GESTURE   = true;
 const POKE_REACH     = 0.07;
 
 const CONTROLLER_COMPONENTS = [
@@ -641,7 +641,7 @@ Il2Cpp.perform(() => {
 	const InputDevicesCls = asmXR ? asmXR.tryClass("UnityEngine.XR.InputDevices") : null;
 	const CommonUsagesCls = asmXR ? asmXR.tryClass("UnityEngine.XR.CommonUsages") : null;
 	let xrReady = false, xrGetDevice: any = null, xrTryBool: any = null, xrTryFloat: any = null;
-	let usageTrigBtn: any = null, usagePrimBtn: any = null, usageSecBtn: any = null, usageTrig: any = null;
+	let usageTrigBtn: any = null, usagePrimBtn: any = null, usageSecBtn: any = null, usageMenuBtn: any = null, usageTrig: any = null;
 	try {
 		if (InputDevicesCls && CommonUsagesCls) {
 			xrGetDevice = InputDevicesCls.method("GetDeviceAtXRNode", 1);
@@ -650,7 +650,7 @@ Il2Cpp.perform(() => {
 			}
 			const getUsage = (n: string) => { try { return CommonUsagesCls.method("get_" + n, 0).invoke(); } catch { return null; } };
 			usageTrigBtn = getUsage("triggerButton"); usagePrimBtn = getUsage("primaryButton");
-			usageSecBtn = getUsage("secondaryButton"); usageTrig = getUsage("trigger");
+			usageSecBtn = getUsage("secondaryButton"); usageMenuBtn = getUsage("menuButton"); usageTrig = getUsage("trigger");
 			xrReady = !!(xrGetDevice && (usageTrigBtn || usagePrimBtn));
 			if (xrReady) log("XR input: InputDevices ready (new Input System)");
 		}
@@ -3120,7 +3120,15 @@ Il2Cpp.perform(() => {
 	function readXButton(): { pressed: boolean; srcs: string[] } {
 		const srcs: string[] = [];
 		let pressed = false;
-		if (xrReady) { srcs.push("XR"); if (xrButton(4, usagePrimBtn) || xrButton(4, usageSecBtn)) pressed = true; }
+		// Quest/XR: left controller X/Y are primary/secondary buttons.
+		// Also check the right controller and menu button so the menu remains
+		// usable across different controller mappings.
+		if (xrReady) {
+			srcs.push("XR");
+			if (xrButton(4, usagePrimBtn) || xrButton(4, usageSecBtn) ||
+				xrButton(5, usagePrimBtn) || xrButton(5, usageSecBtn) ||
+				xrButton(4, usageMenuBtn) || xrButton(5, usageMenuBtn)) pressed = true;
+		}
 		if (ovr.btn) { srcs.push("OVRInput"); if (ovrX()) pressed = true; }
 		if (hvrReady()) { srcs.push("HurricaneVR"); if (hvrX()) pressed = true; }
 		if (legacyOK !== false && legacyGetKey) {
@@ -3440,7 +3448,7 @@ Il2Cpp.perform(() => {
 	log("frame hooks: " + [ovrUpdate ? "OVRCameraRig." + ovrUpdate.name : "", canvasHooked ? "Canvas.SendWillRenderCanvases" : "", backupSrc ? backupSrc + " (backup)" : ""].filter(s => s).join(" + ") + " | late anchoring: " + lateSrc);
 	log("input: " + (ovr.btn ? "OVRInput X" : legacyGetKey ? "Unity input (X = joystick button 2)" : "menu()") +
 		(ovr.axis ? " + trigger" : "") + (ovr.stick ? " + stick scroll" : "") + " | pointer: " + POINTER_MODE + " (auto picks ray / poke / gaze)");
-	log("ready - rig is detected on the first frames; press X to open");
+	log("ready - rig is detected on the first frames; press X/Y or use the wrist gesture to open");
 
 	function compatReport(): string {
 		const has = (asm: string, cls: string) => { try { const a = Il2Cpp.domain.tryAssembly(asm); return !!(a && a.image.tryClass(cls)); } catch { return false; } };
