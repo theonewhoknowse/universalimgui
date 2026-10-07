@@ -3156,8 +3156,30 @@ Il2Cpp.perform(() => {
 	}
 	let triggerLatched = false, triggerInputAvailable = false, triggerSource = "none";
 	let triggerDebugLast = "";
+	let xrProbeLast = "";
+	function xrProbe(): void {
+		if (!xrReady) return;
+		try {
+			const dev = xrDevice(5);
+			if (!dev) { if (xrProbeLast !== "no device") { xrProbeLast = "no device"; log("XR trigger probe: right device = NULL"); } return; }
+			let valid = "?";
+			try { valid = String(!!dev.method("get_isValid", 0).invoke()); } catch {}
+			let name = "?";
+			try { name = String(dev.method("get_name", 0).invoke().content); } catch {}
+			let id = "?";
+			try { id = String(dev.method("get_deviceId", 0).invoke()); } catch {}
+			const b = usageTrigBtn ? xrButton(5, usageTrigBtn) : false;
+			const f = usageTrig ? xrFloat(5, usageTrig) : null;
+			const sig = "valid=" + valid + " name=" + name + " id=" + id + " button=" + b + " float=" + (f === null ? "NULL" : f.toFixed(3));
+			if (sig !== xrProbeLast) { xrProbeLast = sig; log("XR trigger probe: " + sig); }
+		} catch (e) {
+			const sig = "error=" + e;
+			if (sig !== xrProbeLast) { xrProbeLast = sig; log("XR trigger probe: " + sig); }
+		}
+	}
 	function anyClick(): boolean {
 		let value = 0, available = false, source = "none";
+		xrProbe();
 		if (xrReady) {
 			// Quest right trigger. Prefer the binary triggerButton, then the
 			// analog trigger value so either XR mapping can drive clicks.
