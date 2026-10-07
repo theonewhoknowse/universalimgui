@@ -1664,7 +1664,7 @@ Il2Cpp.perform(() => {
 	let pluginDir = "C:/plugins", pluginsScanned = false, pluginScanPending = false;
 	const hostPlugins: { [key: string]: string } = (globalThis as any).__universalimguiPluginFiles || {};
 	const hostPluginDir = String((globalThis as any).__universalimguiPluginDir || "");
-	pluginDir = hostPluginDir;
+	pluginDir = hostPluginDir || pluginDir;
 	const hostPluginMode = Object.keys(hostPlugins).length > 0;
 
 	function libc(name: string, ret: string, args: string[]): any {
