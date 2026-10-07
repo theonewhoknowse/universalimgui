@@ -647,6 +647,7 @@ Il2Cpp.perform(() => {
 
 	const asmXR = Il2Cpp.domain.tryAssembly("UnityEngine.XRModule")?.image ?? Il2Cpp.domain.tryAssembly("UnityEngine.VRModule")?.image ?? null;
 	const InputDevicesCls = asmXR ? asmXR.tryClass("UnityEngine.XR.InputDevices") : null;
+	const InputDeviceCls = asmXR ? asmXR.tryClass("UnityEngine.XR.InputDevice") : null;
 	const CommonUsagesCls = asmXR ? asmXR.tryClass("UnityEngine.XR.CommonUsages") : null;
 	let xrReady = false, xrGetDevice: any = null, xrTryBool: any = null, xrTryFloat: any = null;
 	let usageTrigBtn: any = null, usagePrimBtn: any = null, usageSecBtn: any = null, usageMenuBtn: any = null, usageTrig: any = null;
@@ -674,8 +675,10 @@ Il2Cpp.perform(() => {
 	}
 	function xrFeatureMethod(dev: any, want: "bool" | "float"): any {
 		try {
-			const methods = dev?.class?.methods ?? [];
-			const needle = want === "bool" ? /InputFeatureUsage.*bool|Boolean|System\.Boolean/i : /InputFeatureUsage.*float|Single|System\.Single/i;
+			// InputDevice is a value type, so its instance wrapper may not expose
+			// the method table. Resolve the overloads from the InputDevice class.
+			const methods = InputDeviceCls?.methods ?? [];
+			const needle = want === "bool" ? /Boolean|bool/i : /Single|float/i;
 			for (const m of methods) {
 				if (m.name !== "TryGetFeatureValue" || m.parameterCount !== 2) continue;
 				const ps = m.parameters ?? [];
@@ -3173,7 +3176,7 @@ Il2Cpp.perform(() => {
 			const f = usageTrig ? xrFloat(5, usageTrig) : null;
 			let sigs = "";
 			try {
-				const ms = (dev?.class?.methods ?? []).filter((m: any) => m.name === "TryGetFeatureValue" && m.parameterCount === 2);
+				const ms = (InputDeviceCls?.methods ?? []).filter((m: any) => m.name === "TryGetFeatureValue" && m.parameterCount === 2);
 				sigs = ms.map((m: any) => (m.parameters ?? []).map((p: any) => String(p?.type?.name ?? p?.type ?? "?")).join(",")).join(" | ");
 			} catch {}
 
