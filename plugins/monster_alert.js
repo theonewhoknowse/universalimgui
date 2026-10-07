@@ -1,0 +1,3 @@
+plugin.category("Horror");
+var p=props([{type:"bool",key:"enabled",label:"Alert",default:true},{type:"float",key:"interval",label:"Check Interval",min:.2,max:5,default:1,decimals:1}]),next=0;
+onFrame(function(){if(!p.enabled||Date.now()<next)return;next=Date.now()+Number(p.interval)*1000;try{var GO=Il2Cpp.domain.assembly("UnityEngine.CoreModule").image.class("UnityEngine.GameObject"),f=GO.method("Find",1);var names=["Enemy","Monster","MonsterAI","EnemyAI"];for(var i=0;i<names.length;i++){var o=f.invoke(Il2Cpp.string(names[i]));if(o&&!o.isNull()){notify("MONSTER DETECTED: "+names[i]);break;}}}catch(e){}});tab(function(ui){ui.text("Looks for common enemy GameObject names.");});
