@@ -1,0 +1,5 @@
+plugin.category("Horror");
+var Light=null,Resources=null,saved=[];try{var c=Il2Cpp.domain.assembly("UnityEngine.CoreModule").image;Light=c.class("UnityEngine.Light");Resources=c.class("UnityEngine.Resources");}catch(e){log("Lights Out: "+e);}
+var p=props([{type:"button",label:"Lights Out",onClick:function(){var a=getAll();if(!a)return;for(var i=0;i<a.length;i++)try{var o=a.get(i),m=bind(o.method("get_enabled",0),o),s=bind(o.method("set_enabled",1),o),v=!!m.invoke();saved.push({o:o,v:v});s.invoke(false);}catch(e){}notify("Lights out");}},{type:"button",label:"Restore Lights",onClick:function(){for(var i=0;i<saved.length;i++)try{bind(saved[i].o.method("set_enabled",1),saved[i].o).invoke(saved[i].v);}catch(e){}saved=[];notify("Lights restored");}}]);
+function getAll(){try{return Resources.method("FindObjectsOfTypeAll",1).inflate(Light).invoke();}catch(e){log("Light scan failed: "+e);return null;}}
+tab(function(ui){ui.text("Turn off every loaded Unity Light.");});onDisable(function(){for(var i=0;i<saved.length;i++)try{bind(saved[i].o.method("set_enabled",1),saved[i].o).invoke(saved[i].v);}catch(e){}saved=[];});
