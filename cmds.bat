@@ -2,7 +2,7 @@
 setlocal
 
 REM Always resolve plugins relative to this BAT file, not the current shell directory.
-set "PLUGIN_DIR=%~dp0plugins"
+set "PLUGIN_DIR=C:\plugins"
 set "BUNDLE_FILE=%~dp0plugin_bundle.js"
 set "BRIDGE_FILE=%~dp0frida-il2cpp-bridge.js"
 set "SCRIPT_FILE=%~dp0script.ts"
