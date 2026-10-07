@@ -2441,57 +2441,90 @@ Il2Cpp.perform(() => {
 	}
 
 	function funTab() {
-		if (collapsingHeader("Groq AI", true)) {
-			text("Ask Groq questions from inside the game.", C.TextDisabled);
-			if (button("Prompt: " + (funInput ? funInput.slice(0, 72) : "(tap to type)"))) funOpenKeyboard();
-			if (button("Send to Groq")) funSend();
-			if (funRequest) progressBar(0.5, "Groq is thinking...");
-			text("Status: " + funStatus, C.TextDisabled);
-			if (funReply) {
-				separator();
-				text("Response:", C.Accent);
-				for (const line of funReply.split(/\\n/)) text(line.slice(0, 180), C.Text);
+		// Fun is intentionally organized as small sections instead of a long
+		// wall of buttons. Keep the most useful toys near the top.
+		text("Experiments, visual nonsense, and AI. Nothing here is required.", C.TextDisabled);
+
+		if (collapsingHeader("Quick Toys", true)) {
+			text("One-tap toys for messing with the game.", C.TextDisabled);
+			if (button("Spawn Cube")) toySpawnCube(false);
+			if (button("Launch Cube")) toySpawnCube(true);
+			if (button("Physics Blast")) toyExplode();
+			if (button("Random Event")) toyRandomEvent();
+			if (checkbox("Rainbow World", toyRainbow)) {
+				if (toyRainbow.v) toyScanRainbow();
+				notify("Rainbow world " + (toyRainbow.v ? "on" : "off"));
+			}
+			if (button("Reset Game Toys")) toyRestore();
+		}
+
+		if (collapsingHeader("Game Toys", false)) {
+			text("Change the game itself, then restore everything with one button.", C.TextDisabled);
+			if (sliderFloat("Time Scale", toyTimeScale, 0.05, 4, 2)) toyApplyTimeScale(toyTimeScale.v);
+			if (sliderFloat("Gravity", toyGravity, -30, 30, 2)) toyApplyGravity(toyGravity.v);
+			if (sliderFloat("Rig Scale", toyRigScale, 0.5, 2.5, 2)) toySetRigScale(toyRigScale.v);
+			text("Current gravity: " + toyReadGravity().toFixed(2), C.TextDisabled);
+			if (button("Reset Time / Gravity / Scale")) {
+				toyApplyTimeScale(1);
+				toyApplyGravity(-9.81);
+				toySetRigScale(1);
+				notify("Game settings restored");
 			}
 		}
 
 		if (collapsingHeader("Visual Toys", false)) {
-			text("Purely visual effects for the menu and HUD.", C.TextDisabled);
-			if (button("Rainbow UI")) { visualRainbow=!visualRainbow; notify("Rainbow UI "+(visualRainbow?"on":"off")); }
-			if (button("Invert UI")) { visualInvert=!visualInvert; notify("UI invert "+(visualInvert?"on":"off")); }
-			if (button("CRT Mode")) { visualCRT=!visualCRT; notify("CRT mode "+(visualCRT?"on":"off")); }
-			if (button("Matrix Rain")) { visualMatrix=!visualMatrix; notify("Matrix rain "+(visualMatrix?"on":"off")); }
-			if (button("Fake Error Screen")) { visualError=!visualError; notify("Fake error screen "+(visualError?"on":"off")); }
-			if (button("Doom Mode")) { visualDoom=!visualDoom; notify("Doom mode "+(visualDoom?"on":"off")); }
-			if (button("Windows 95 Mode")) { visualWin95=!visualWin95; notify("Windows 95 mode "+(visualWin95?"on":"off")); }
-			if (button("Reset Visual Toys")) {
-				visualRainbow=false; visualInvert=false; visualCRT=false; visualMatrix=false; visualError=false; visualDoom=false; visualWin95=false; visualApply();
+			text("These only change the UniversalImgui look.", C.TextDisabled);
+			if (checkbox("Rainbow UI", ref(visualRainbow))) {
+				visualRainbow = !visualRainbow;
+			}
+			if (checkbox("Invert UI", ref(visualInvert))) visualInvert = !visualInvert;
+			if (checkbox("CRT Mode", ref(visualCRT))) visualCRT = !visualCRT;
+			if (checkbox("Matrix Rain", ref(visualMatrix))) visualMatrix = !visualMatrix;
+			if (checkbox("Fake Error Screen", ref(visualError))) visualError = !visualError;
+			if (checkbox("Doom Mode", ref(visualDoom))) visualDoom = !visualDoom;
+			if (checkbox("Windows 95 Mode", ref(visualWin95))) visualWin95 = !visualWin95;
+			if (button("Reset Visuals")) {
+				visualRainbow = false; visualInvert = false; visualCRT = false;
+				visualMatrix = false; visualError = false; visualDoom = false; visualWin95 = false;
+				visualApply();
 				notify("Visual toys reset");
 			}
 			if (visualMatrix) {
-				text("MATRIX RAIN", C.Accent);
+				separator();
+				text("MATRIX // LIVE", C.Accent);
 				for (const line of visualMatrixLines()) text(line, C.Text);
 			}
 			if (visualError) {
 				separator();
-				text("████ SYSTEM FAILURE ████", C.Accent);
+				text("SYSTEM FAILURE", C.Accent);
 				text("KERNEL PANIC: UI.EXE", C.Text);
 				text("ERROR 0xC0FFEE", C.Text);
 				text("Reality.dll has stopped responding.", C.TextDisabled);
-				text("Press RESET to continue.", C.TextDisabled);
-			}
-			if (visualCRT) {
-				text("────────────────────────", C.TextDisabled);
-				text("CRT SIGNAL // 60Hz // SCANLINES", C.TextDisabled);
 			}
 		}
 
-		if (collapsingHeader("Groq API Key", false)) {
-			text("API key: " + (funApiKey ? "set (runtime only)" : "not set"), C.TextDisabled);
-			text("Frida console: groq.setKey(\"...\")", C.TextDisabled);
-			text("Key is not stored in the repo.", C.TextDisabled);
+		if (collapsingHeader("Groq AI", false)) {
+			text("Ask Groq something without leaving VR.", C.TextDisabled);
+			text("Model: " + funModel, C.TextDisabled);
+			if (button("Prompt: " + (funInput ? funInput.slice(0, 52) : "tap to type"))) funOpenKeyboard();
+			if (button(funRequest ? "Groq is thinking..." : "Send Prompt")) {
+				if (!funRequest) funSend();
+			}
+			text("Status: " + funStatus, funRequest ? C.Accent : C.TextDisabled);
+			if (funReply) {
+				separator();
+				text("Response", C.Accent);
+				for (const line of funReply.split(/\\n/)) text(line.slice(0, 180), C.Text);
+			}
 		}
 
-		toysTabBody();
+		if (collapsingHeader("Groq Setup", false)) {
+			text("Key: " + (funApiKey ? "configured for this session" : "not configured"), funApiKey ? C.Text : C.TextDisabled);
+			text("Set it from the Frida console:", C.TextDisabled);
+			text('groq.setKey("YOUR_KEY")', C.Accent);
+			text("Model: " + funModel, C.TextDisabled);
+			text("The key is runtime-only and is not saved by the menu.", C.TextDisabled);
+		}
 	}
 
 	function info() {
