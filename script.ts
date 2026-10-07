@@ -656,7 +656,11 @@ Il2Cpp.perform(() => {
 			for (const m of InputDevicesCls.methods) {
 				if (m.name !== "GetDeviceAtXRNode") continue;
 			}
-			const getUsage = (n: string) => { try { return CommonUsagesCls.method("get_" + n, 0).invoke(); } catch { return null; } };
+			const getUsage = (n: string) => {
+				try { return CommonUsagesCls.field(n).value; } catch {}
+				try { return CommonUsagesCls.method("get_" + n, 0).invoke(); } catch {}
+				return null;
+			};
 			usageTrigBtn = getUsage("triggerButton"); usagePrimBtn = getUsage("primaryButton");
 			usageSecBtn = getUsage("secondaryButton"); usageMenuBtn = getUsage("menuButton"); usageTrig = getUsage("trigger");
 			xrReady = !!(xrGetDevice && (usageTrigBtn || usagePrimBtn));
