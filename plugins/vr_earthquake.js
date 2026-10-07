@@ -1,0 +1,4 @@
+plugin.category("VR");
+var Physics=null,next=0;try{Physics=Il2Cpp.domain.assembly("UnityEngine.PhysicsModule").image.class("UnityEngine.Physics");}catch(e){}
+var p=props([{type:"bool",key:"enabled",label:"Earthquake",default:false},{type:"float",key:"force",label:"Force",min:1,max:50,default:8,decimals:0},{type:"float",key:"interval",label:"Interval",min:.05,max:1,default:.15,decimals:2}]);
+onFrame(function(){if(!p.enabled||!Physics||Date.now()<next)return;next=Date.now()+Number(p.interval)*1000;try{var a=Physics.method("OverlapSphere",3).invoke(v3(0,0,0),100,-1,1);if(!a)return;for(var i=0;i<a.length;i++){var rb=a.get(i).method("get_attachedRigidbody",0).invoke();if(rb&&!rb.isNull())bind(rb.method("AddForce",2),rb).invoke(v3((Math.random()-.5)*Number(p.force),(Math.random()-.5)*Number(p.force),(Math.random()-.5)*Number(p.force)),1);}}catch(e){}});tab(function(ui){ui.text("Shake nearby physics objects with random impulses.");});
