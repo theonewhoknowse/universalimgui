@@ -1735,6 +1735,10 @@ Il2Cpp.perform(() => {
 		if (pl.enabled === undefined) pl.enabled = true;
 		const api = {
 			file: pl.file, name: pl.name,
+			unityClass: (name: string, assembly?: string) => { try { const img = assembly ? Il2Cpp.domain.tryAssembly(assembly)?.image : null; return img ? (img.tryClass(name) || null) : findClassAnywhere(name); } catch { return null; } },
+			findObjects: (klass: any) => objectsOf(klass),
+			findObject: (klass: any) => objectOf(klass),
+			getComponent: (go: any, klass: any) => getComp(go, klass),
 			category: (name: string) => { pl.category = String(name || "General"); },
 			v3: (x: number, y: number, z: number) => v3(x, y, z),
 			vec3: (v: any) => { try { return xyz(v); } catch { return null; } },
@@ -1755,9 +1759,9 @@ Il2Cpp.perform(() => {
 		const pMain = (fn: any, ms?: number) => (globalThis as any).__imguiMain(() => { if (pl.enabled) withOwner(pl, fn); }, ms);
 		try {
 			const fn = new Function("tab", "onFrame", "onDisable", "props", "log", "notify", "ref", "ui", "plugin", "console", "mainThread", "v3", "vec3", "bind", "rightHand", "trigger",
-				"Il2Cpp", "setTimeout", "setInterval", "clearTimeout", "clearInterval", code);
+				"Il2Cpp", "setTimeout", "setInterval", "clearTimeout", "clearInterval", "unityClass", "findObjects", "findObject", "getComponent", code);
 			withOwner(pl, () => fn(api.tab, api.onFrame, api.onDisable, api.props, push, notify, ref, ui, api, pconsole, pMain, api.v3, api.vec3, api.bind, api.rightHand, api.trigger,
-				pIl2Cpp, pSetTimeout, pSetInterval, clearTimeout, clearInterval));
+				pIl2Cpp, pSetTimeout, pSetInterval, clearTimeout, clearInterval, api.unityClass, api.findObjects, api.findObject, api.getComponent));
 			pl.status = "loaded";
 		} catch (e) {
 			pl.status = "error: " + e;
