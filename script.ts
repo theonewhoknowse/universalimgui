@@ -1787,9 +1787,15 @@ Il2Cpp.perform(() => {
 		(globalThis as any).__imguiMain(() => { on ? enablePlugin(pl) : disablePlugin(pl); if (pl.toggle) pl.toggle.v = !!pl.enabled; });
 	}
 	function scanPlugins(): number {
-		if (!pluginDir) return 0;
-		if (!hostPluginMode && c_mkdir) try { c_mkdir(Memory.allocUtf8String(pluginDir), 0o771); } catch {}
-		let files = hostPluginMode ? Object.keys(hostPlugins).filter(f => /\.js$/i.test(f)).sort() : listJs(pluginDir);
+		// Plugins are PC-side only. Never read or execute plugin .js files from
+		// the Quest filesystem. The launcher supplies the PC bundle through
+		// __universalimguiPluginFiles.
+		if (!hostPluginMode) {
+			if (!pluginsScanned) log("plugins: no PC plugin bundle supplied; headset plugins are disabled");
+			pluginsScanned = true;
+			return 0;
+		}
+		let files = Object.keys(hostPlugins).filter(f => /\.js$/i.test(f)).sort();
 		if (files === null) { log("plugins: can't read " + pluginDir); return 0; }
 		if (files.length === 0 && !pluginsScanned && !hostPluginMode) {
 			try { (File as any).writeAllText(pluginDir + "/example_plugin.js", EXAMPLE_PLUGIN); files = ["example_plugin.js"]; }
@@ -1842,18 +1848,13 @@ Il2Cpp.perform(() => {
 		setTimeout(() => Il2Cpp.perform(() => { try { scanPlugins(); } finally { pluginScanPending = false; } }), 0);
 	}
 	function pluginsFrame() {
-		if (!pluginDir) {
-			let base = "";
-			try { base = String(need(asmCore, "UnityEngine.Application").method("get_persistentDataPath", 0).invoke().content); } catch {}
-			if (!base && appId) base = "/sdcard/Android/data/" + appId + "/files";
-			if (base) { pluginDir = base + "/imgui_plugins"; requestScan(); }
-		}
 		for (const pl of pluginList) {
 			if (!pl.frame || pl.enabled === false) continue;
 			try { withOwner(pl, () => pl.frame!()); pl.fails = 0; }
 			catch (e) { errOnce(pl.name + " onFrame", e); if (++pl.fails >= 3) { pl.frame = null; pl.status = "onFrame switched off: " + e; } }
 		}
 	}
+
 	interface PropDef {
 		type: "bool" | "float" | "int" | "select" | "text" | "button" | "label";
 		key?: string; label?: string; desc?: string;
