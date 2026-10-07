@@ -21,18 +21,28 @@ function pose(){
 }
 
 function findPlayer(){
-    if(!GO||!RB)return null;
-    var names=["Player","GorillaPlayer","GorillaLocomotion","GorillaPlayerController"];
-    for(var i=0;i<names.length;i++)try{
-        var o=GO.method("Find",1).invoke(Il2Cpp.string(names[i]));
-        if(o&&!o.isNull()){
-            var rb=getComponent(o,RB);
+    if(!RB)return null;
+    try{
+        var h=rightHand(); if(!h)return null;
+        var parent=null;
+        try{parent=bind(h.method("get_parent",0),h).invoke();}catch(e){}
+        if(!parent||parent.isNull())return null;
+
+        // Gorilla-style rigs: the right hand is parented to the player's body.
+        // Use the parent's Rigidbody so the grapple swings the whole player.
+        try{
+            var rb=getComponent(parent,RB);
             if(rb&&!rb.isNull())return rb;
-        }
+        }catch(e){}
+
+        try{
+            var go=bind(parent.method("get_gameObject",0),parent).invoke();
+            var rb2=getComponent(go,RB);
+            if(rb2&&!rb2.isNull())return rb2;
+        }catch(e){}
     }catch(e){}
     return null;
 }
-
 function findAnchor(q){
     if(!Physics)return null;
     try{
