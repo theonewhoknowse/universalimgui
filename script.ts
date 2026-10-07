@@ -675,13 +675,14 @@ Il2Cpp.perform(() => {
 	function xrFeatureMethod(dev: any, want: "bool" | "float"): any {
 		try {
 			const methods = dev?.class?.methods ?? [];
-			const needle = want === "bool" ? /Boolean|bool/i : /Single|float/i;
+			const needle = want === "bool" ? /InputFeatureUsage.*bool|Boolean|System\.Boolean/i : /InputFeatureUsage.*float|Single|System\.Single/i;
 			for (const m of methods) {
 				if (m.name !== "TryGetFeatureValue" || m.parameterCount !== 2) continue;
-				if (needle.test(String(m.parameters[1].type.name))) {
-					const bound = bindTo(m, dev);
-					if (bound) return bound;
-				}
+				const ps = m.parameters ?? [];
+				const sig = ps.map((p: any) => String(p?.type?.name ?? p?.type ?? "")).join(" -> ");
+				if (!needle.test(sig)) continue;
+				const bound = bindTo(m, dev);
+				if (bound) return bound;
 			}
 		} catch {}
 		return null;
@@ -3170,7 +3171,13 @@ Il2Cpp.perform(() => {
 			try { id = String(dev.method("get_deviceId", 0).invoke()); } catch {}
 			const b = usageTrigBtn ? xrButton(5, usageTrigBtn) : false;
 			const f = usageTrig ? xrFloat(5, usageTrig) : null;
-			const sig = "valid=" + valid + " name=" + name + " id=" + id + " button=" + b + " float=" + (f === null ? "NULL" : f.toFixed(3));
+			let sigs = "";
+			try {
+				const ms = (dev?.class?.methods ?? []).filter((m: any) => m.name === "TryGetFeatureValue" && m.parameterCount === 2);
+				sigs = ms.map((m: any) => (m.parameters ?? []).map((p: any) => String(p?.type?.name ?? p?.type ?? "?")).join(",")).join(" | ");
+			} catch {}
+
+			const sig = "valid=" + valid + " name=" + name + " id=" + id + " button=" + b + " float=" + (f === null ? "NULL" : f.toFixed(3)) + " overloads=" + sigs;
 			if (sig !== xrProbeLast) { xrProbeLast = sig; log("XR trigger probe: " + sig); }
 		} catch (e) {
 			const sig = "error=" + e;
