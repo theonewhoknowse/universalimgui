@@ -1661,7 +1661,7 @@ Il2Cpp.perform(() => {
 	log("plugins: hook tracking - Interceptor.attach " + (attachOK ? "yes" : "NO") + ", Interceptor.replace " + (replaceOK ? "yes" : "NO") +
 		", method.implementation " + (implHookOK ? "yes" : "NO"));
 	const pluginList: Plugin[] = [];
-	let pluginDir = "", pluginsScanned = false, pluginScanPending = false;
+	let pluginDir = "C:/plugins", pluginsScanned = false, pluginScanPending = false;
 	const hostPlugins: { [key: string]: string } = (globalThis as any).__universalimguiPluginFiles || {};
 	const hostPluginDir = String((globalThis as any).__universalimguiPluginDir || "");
 	pluginDir = hostPluginDir;
