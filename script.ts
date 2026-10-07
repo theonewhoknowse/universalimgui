@@ -660,19 +660,34 @@ Il2Cpp.perform(() => {
 			usageTrigBtn = getUsage("triggerButton"); usagePrimBtn = getUsage("primaryButton");
 			usageSecBtn = getUsage("secondaryButton"); usageMenuBtn = getUsage("menuButton"); usageTrig = getUsage("trigger");
 			xrReady = !!(xrGetDevice && (usageTrigBtn || usagePrimBtn));
-			if (xrReady) log("XR input: InputDevices ready (new Input System)");
+			if (xrReady) log("XR input: InputDevices ready (new Input System), triggerButton=" + !!usageTrigBtn + ", trigger=" + !!usageTrig);
+			else log("XR input unavailable: InputDevices=" + !!InputDevicesCls + " CommonUsages=" + !!CommonUsagesCls + " GetDevice=" + !!xrGetDevice + " triggerButton=" + !!usageTrigBtn + " trigger=" + !!usageTrig);
 		}
 	} catch (e) { xrReady = false; }
 	function xrDevice(node: number): any {
 		if (!xrReady) return null;
 		try { const d = xrGetDevice.invoke(node); return d; } catch { return null; }
 	}
+	function xrFeatureMethod(dev: any, want: "bool" | "float"): any {
+		try {
+			const methods = dev?.class?.methods ?? [];
+			const needle = want === "bool" ? /Boolean|bool/i : /Single|float/i;
+			for (const m of methods) {
+				if (m.name !== "TryGetFeatureValue" || m.parameterCount !== 2) continue;
+				if (needle.test(String(m.parameters[1].type.name))) {
+					const bound = bindTo(m, dev);
+					if (bound) return bound;
+				}
+			}
+		} catch {}
+		return null;
+	}
 	function xrButton(node: number, usage: any): boolean {
 		if (!xrReady || !usage) return false;
 		try {
 			const dev = xrDevice(node);
 			if (!dev) return false;
-			const m = dev.method ? dev.method("TryGetFeatureValue", 2) : null;
+			const m = xrFeatureMethod(dev, "bool");
 			if (!m) return false;
 			const out = Memory.alloc(4);
 			const ok = m.invoke(usage, out);
@@ -684,7 +699,7 @@ Il2Cpp.perform(() => {
 		try {
 			const dev = xrDevice(node);
 			if (!dev) return null;
-			const m = dev.method ? dev.method("TryGetFeatureValue", 2) : null;
+			const m = xrFeatureMethod(dev, "float");
 			if (!m) return null;
 			const out = Memory.alloc(4);
 			if (!m.invoke(usage, out)) return null;
