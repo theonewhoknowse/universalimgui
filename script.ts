@@ -1736,6 +1736,7 @@ Il2Cpp.perform(() => {
 		const api = {
 			file: pl.file, name: pl.name,
 			category: (name: string) => { pl.category = String(name || "General"); },
+			v3: (x: number, y: number, z: number) => v3(x, y, z),
 			tab: (fn: any) => { pl.draw = typeof fn === "function" ? fn : null; },
 			onFrame: (fn: any) => { pl.frame = typeof fn === "function" ? fn : null; },
 			onDisable: (fn: any) => { if (typeof fn === "function") pl.cleanup!.push(fn); },
@@ -1749,9 +1750,9 @@ Il2Cpp.perform(() => {
 		const pSetInterval = (fn: any, ms?: number, ...a: any[]) => { const id = setInterval(() => { if (pl.enabled) withOwner(pl, () => fn(...a)); }, ms); pl.timers!.push({ kind: "i", id }); return id; };
 		const pMain = (fn: any, ms?: number) => (globalThis as any).__imguiMain(() => { if (pl.enabled) withOwner(pl, fn); }, ms);
 		try {
-			const fn = new Function("tab", "onFrame", "onDisable", "props", "log", "notify", "ref", "ui", "plugin", "console", "mainThread",
+			const fn = new Function("tab", "onFrame", "onDisable", "props", "log", "notify", "ref", "ui", "plugin", "console", "mainThread", "v3",
 				"Il2Cpp", "setTimeout", "setInterval", "clearTimeout", "clearInterval", code);
-			withOwner(pl, () => fn(api.tab, api.onFrame, api.onDisable, api.props, push, notify, ref, ui, api, pconsole, pMain,
+			withOwner(pl, () => fn(api.tab, api.onFrame, api.onDisable, api.props, push, notify, ref, ui, api, pconsole, pMain, api.v3,
 				pIl2Cpp, pSetTimeout, pSetInterval, clearTimeout, clearInterval));
 			pl.status = "loaded";
 		} catch (e) {
