@@ -18,3 +18,14 @@ The PC plugin bundle is created at launch. If you edit or add a plugin while Fri
 Do not edit `plugin_bundle.js` manually. It is generated automatically.
 
 Plugins use the normal UniversalImgui plugin API: `props`, `tab`, `onFrame`, `onDisable`, `notify`, `log`, `Il2Cpp`, and the other APIs exposed by the menu.
+
+
+## Plugin categories
+
+Plugins can choose a category with:
+
+```js
+plugin.category("Sandbox");
+```
+
+The Plugins tab groups plugins into collapsible category sections. Plugins that do not choose a category appear under **General**.
