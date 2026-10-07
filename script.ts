@@ -1737,6 +1737,10 @@ Il2Cpp.perform(() => {
 			file: pl.file, name: pl.name,
 			category: (name: string) => { pl.category = String(name || "General"); },
 			v3: (x: number, y: number, z: number) => v3(x, y, z),
+			vec3: (v: any) => { try { return xyz(v); } catch { return null; } },
+			bind: (m: any, obj: any) => bindTo(m, obj),
+			rightHand: () => rightT,
+			trigger: () => anyClick(),
 			tab: (fn: any) => { pl.draw = typeof fn === "function" ? fn : null; },
 			onFrame: (fn: any) => { pl.frame = typeof fn === "function" ? fn : null; },
 			onDisable: (fn: any) => { if (typeof fn === "function") pl.cleanup!.push(fn); },
@@ -1750,9 +1754,9 @@ Il2Cpp.perform(() => {
 		const pSetInterval = (fn: any, ms?: number, ...a: any[]) => { const id = setInterval(() => { if (pl.enabled) withOwner(pl, () => fn(...a)); }, ms); pl.timers!.push({ kind: "i", id }); return id; };
 		const pMain = (fn: any, ms?: number) => (globalThis as any).__imguiMain(() => { if (pl.enabled) withOwner(pl, fn); }, ms);
 		try {
-			const fn = new Function("tab", "onFrame", "onDisable", "props", "log", "notify", "ref", "ui", "plugin", "console", "mainThread", "v3",
+			const fn = new Function("tab", "onFrame", "onDisable", "props", "log", "notify", "ref", "ui", "plugin", "console", "mainThread", "v3", "vec3", "bind", "rightHand", "trigger",
 				"Il2Cpp", "setTimeout", "setInterval", "clearTimeout", "clearInterval", code);
-			withOwner(pl, () => fn(api.tab, api.onFrame, api.onDisable, api.props, push, notify, ref, ui, api, pconsole, pMain, api.v3,
+			withOwner(pl, () => fn(api.tab, api.onFrame, api.onDisable, api.props, push, notify, ref, ui, api, pconsole, pMain, api.v3, api.vec3, api.bind, api.rightHand, api.trigger,
 				pIl2Cpp, pSetTimeout, pSetInterval, clearTimeout, clearInterval));
 			pl.status = "loaded";
 		} catch (e) {
