@@ -1,4 +1,7 @@
 plugin.category("VR");
-var p=props([{type:"float",key:"range",label:"Reach Multiplier",min:1,max:20,default:5,decimals:1}]);
+var Physics=unityClass("UnityEngine.Physics"),target=null;
+var p=props([{type:"bool",key:"enabled",label:"Infinite Reach",default:false},{type:"float",key:"range",label:"Reach",min:3,max:50,default:20,decimals:0},{type:"float",key:"force",label:"Pull Force",min:5,max:300,default:60,decimals:0}]);
 function pose(){var h=rightHand();if(!h)return null;try{return{p:vec3(bind(h.method("get_position",0),h).invoke()),f:vec3(bind(h.method("get_forward",0),h).invoke())};}catch(e){return null;}}
-onFrame(function(){});tab(function(ui){var q=pose();ui.text("Right-hand ray reach is "+Number(p.range).toFixed(1)+"x.");ui.text("Use this as the shared reach setting for future interaction plugins.");});
+function pick(q){if(!Physics)return null;try{var center=[q.p[0]+q.f[0]*Number(p.range),q.p[1]+q.f[1]*Number(p.range),q.p[2]+q.f[2]*Number(p.range)],a=Physics.method("OverlapSphere",3).invoke(v3(center[0],center[1],center[2]),2,-1,1),best=null,bd=99999;for(var i=0;i<a.length;i++){var rb=a.get(i).method("get_attachedRigidbody",0).invoke();if(!rb||rb.isNull())continue;var pos=vec3(bind(rb.method("get_position",0),rb).invoke()),d=Math.hypot(pos[0]-center[0],pos[1]-center[1],pos[2]-center[2]);if(d<bd){bd=d;best=rb;}}return best;}catch(e){return null;}}
+onFrame(function(){var q=pose();if(!q||!Physics)return;if(!p.enabled){target=null;return;}if(trigger()&&!target)target=pick(q);if(!trigger())target=null;if(target)try{var pos=vec3(bind(target.method("get_position",0),target).invoke()),t=[q.p[0]+q.f[0]*4,q.p[1]+q.f[1]*4,q.p[2]+q.f[2]*4];bind(target.method("AddForce",2),target).invoke(v3((t[0]-pos[0])*Number(p.force),(t[1]-pos[1])*Number(p.force),(t[2]-pos[2])*Number(p.force)),5);}catch(e){target=null;}});
+tab(function(ui){ui.text("Hold trigger to pull a distant Rigidbody to your hand.");});
