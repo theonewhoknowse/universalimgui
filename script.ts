@@ -1663,6 +1663,7 @@ Il2Cpp.perform(() => {
 	const pluginList: Plugin[] = [];
 	let pluginDir = "", pluginsScanned = false, pluginScanPending = false;
 	const hostPlugins: { [key: string]: string } = (globalThis as any).__universalimguiPluginFiles || {};
+	const hostPluginDir = String((globalThis as any).__universalimguiPluginDir || "");
 	const hostPluginMode = Object.keys(hostPlugins).length > 0;
 
 	function libc(name: string, ret: string, args: string[]): any {
@@ -1791,7 +1792,7 @@ Il2Cpp.perform(() => {
 		// the Quest filesystem. The launcher supplies the PC bundle through
 		// __universalimguiPluginFiles.
 		if (!hostPluginMode) {
-			if (!pluginsScanned) log("plugins: no PC plugin bundle supplied; headset plugins are disabled");
+			if (!pluginsScanned) log("plugins: no PC plugin bundle supplied" + (hostPluginDir ? " (" + hostPluginDir + ")" : "") + "; headset plugins are disabled");
 			pluginsScanned = true;
 			return 0;
 		}
