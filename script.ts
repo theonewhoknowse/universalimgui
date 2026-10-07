@@ -1600,7 +1600,7 @@ Il2Cpp.perform(() => {
 	}
 
 	interface Plugin {
-		name: string; file: string; builtin: boolean; status: string; logs: string[];
+		name: string; file: string; builtin: boolean; category?: string; status: string; logs: string[];
 		draw: ((ui: any) => void) | null; frame: (() => void) | null; fails: number;
 		enabled?: boolean; code?: string; toggle?: { v: boolean };
 		props?: PropDef[]; propRefs?: { [key: string]: any }; propBag?: any;
@@ -1735,6 +1735,7 @@ Il2Cpp.perform(() => {
 		if (pl.enabled === undefined) pl.enabled = true;
 		const api = {
 			file: pl.file, name: pl.name,
+			category: (name: string) => { pl.category = String(name || "General"); },
 			tab: (fn: any) => { pl.draw = typeof fn === "function" ? fn : null; },
 			onFrame: (fn: any) => { pl.frame = typeof fn === "function" ? fn : null; },
 			onDisable: (fn: any) => { if (typeof fn === "function") pl.cleanup!.push(fn); },
@@ -1949,27 +1950,34 @@ Il2Cpp.perform(() => {
 		sameLine(); if (button("All On")) for (const pl of list) setPlugin(pl, true);
 		sameLine(); if (button("All Off")) for (const pl of list) setPlugin(pl, false);
 		if (!list.length) text(hostPluginMode ? "No PC plugins found. Put .js files in the PC plugins folder and restart the launcher." : "No plugins yet - put .js files in the folder above, then Load New Plugins.", C.TextDisabled);
-		for (const pl of list) {
-			const on = !!pl.enabled;
-			const tag = pl.status.startsWith("error") ? "   [ERROR]" : on ? "   [ON]" : "   [OFF]";
-			if (!collapsingHeader(pl.name + tag + "###plugin:" + pl.file, false)) continue;
+		const categories: { [key: string]: Plugin[] } = {};
+		for (const pl of list) { const cat = pl.category || "General"; (categories[cat] ??= []).push(pl); }
+		for (const cat of Object.keys(categories).sort()) {
+			if (!collapsingHeader(cat + " (" + categories[cat].length + ")###plugin-category:" + cat, true)) continue;
 			indent(12);
-			const t = pl.toggle ?? (pl.toggle = ref(on));
-			if (checkbox("Enabled", t, pl.file + " - " + pl.status)) setPlugin(pl, t.v);
-			if (on) {
-				const nh = hookCount(pl);
-				text("hooks recorded: " + nh + " (Off removes these)", C.TextDisabled);
-				if (nh === 0 && /\.implementation\s*=|Interceptor\.(attach|replace)/.test(pl.code ?? ""))
-					text("this plugin hooks but none were recorded - Off can't undo them; restart frida instead", [1, 0.6, 0.4, 1]);
+			for (const pl of categories[cat]) {
+				const on = !!pl.enabled;
+				const tag = pl.status.startsWith("error") ? "   [ERROR]" : on ? "   [ON]" : "   [OFF]";
+				if (!collapsingHeader(pl.name + tag + "###plugin:" + pl.file, false)) continue;
+				indent(12);
+				const t = pl.toggle ?? (pl.toggle = ref(on));
+				if (checkbox("Enabled", t, pl.file + " - " + pl.status)) setPlugin(pl, t.v);
+				if (on) {
+					const nh = hookCount(pl);
+					text("hooks recorded: " + nh + " (Off removes these)", C.TextDisabled);
+					if (nh === 0 && /\.implementation\s*=|Interceptor\.(attach|replace)/.test(pl.code ?? ""))
+						text("this plugin hooks but none were recorded - Off can't undo them; restart frida instead", [1, 0.6, 0.4, 1]);
+				}
+				if (on) {
+					if (pl.props && pl.props.length) drawProps(pl);
+					if (pl.draw) {
+						try { withOwner(pl, () => pl.draw!(ui)); }
+						catch (e) { pl.draw = null; pl.status = "settings switched off: " + e; notify(pl.name + ": settings error"); }
+					} else if (!(pl.props && pl.props.length) && pl.status.startsWith("loaded")) text("(no settings - it just runs)", C.TextDisabled);
+				}
+				for (const l of pl.logs) text(l, C.TextDisabled);
+				unindent(12);
 			}
-			if (on) {
-				if (pl.props && pl.props.length) drawProps(pl);
-				if (pl.draw) {
-					try { withOwner(pl, () => pl.draw!(ui)); }
-					catch (e) { pl.draw = null; pl.status = "settings switched off: " + e; notify(pl.name + ": settings error"); }
-				} else if (!(pl.props && pl.props.length) && pl.status.startsWith("loaded")) text("(no settings - it just runs)", C.TextDisabled);
-			}
-			for (const l of pl.logs) text(l, C.TextDisabled);
 			unindent(12);
 		}
 	}
