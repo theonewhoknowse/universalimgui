@@ -1664,6 +1664,7 @@ Il2Cpp.perform(() => {
 	let pluginDir = "", pluginsScanned = false, pluginScanPending = false;
 	const hostPlugins: { [key: string]: string } = (globalThis as any).__universalimguiPluginFiles || {};
 	const hostPluginDir = String((globalThis as any).__universalimguiPluginDir || "");
+	pluginDir = hostPluginDir;
 	const hostPluginMode = Object.keys(hostPlugins).length > 0;
 
 	function libc(name: string, ret: string, args: string[]): any {
@@ -1844,7 +1845,7 @@ Il2Cpp.perform(() => {
 		return added;
 	}
 	function requestScan() {
-		if (pluginScanPending || !pluginDir) return;
+		if (pluginScanPending || (!pluginDir && !hostPluginMode)) return;
 		pluginScanPending = true;
 		setTimeout(() => Il2Cpp.perform(() => { try { scanPlugins(); } finally { pluginScanPending = false; } }), 0);
 	}
