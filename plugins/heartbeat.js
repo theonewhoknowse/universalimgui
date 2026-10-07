@@ -1,0 +1,6 @@
+plugin.category("Horror");
+var AS=null,Resources=null,source=null,nextScan=0;try{var c=Il2Cpp.domain.assembly("UnityEngine.CoreModule").image;AS=c.class("UnityEngine.AudioSource");Resources=c.class("UnityEngine.Resources");}catch(e){}
+var p=props([{type:"bool",key:"enabled",label:"Heartbeat",default:true},{type:"float",key:"volume",label:"Volume",min:0,max:2,default:.7,decimals:1},{type:"float",key:"pitch",label:"Pitch",min:.5,max:2,default:1,decimals:2}]);
+function find(){try{var a=Resources.method("FindObjectsOfTypeAll",1).inflate(AS).invoke();for(var i=0;i<a.length;i++){var o=a.get(i),n=String(bind(o.method("get_name",0),o).invoke().content||"").toLowerCase();if(n.indexOf("heart")>=0||n.indexOf("pulse")>=0)return o;}}catch(e){}return null;}
+onFrame(function(){if(!p.enabled){if(source)try{bind(source.method("set_volume",1),source).invoke(0);}catch(e){}return;}if(!source||Date.now()>nextScan){source=find();nextScan=Date.now()+3000;}if(source)try{bind(source.method("set_volume",1),source).invoke(Number(p.volume));bind(source.method("set_pitch",1),source).invoke(Number(p.pitch));if(!bind(source.method("get_isPlaying",0),source).invoke())bind(source.method("Play",0),source).invoke();}catch(e){}});
+tab(function(ui){ui.text("Find a loaded heartbeat/pulse AudioSource.");});
