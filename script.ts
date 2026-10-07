@@ -2421,65 +2421,58 @@ Il2Cpp.perform(() => {
 	}
 
 	function funTab() {
-		text("Groq AI", C.Accent);
-		text("Type a prompt with the Quest keyboard, then send it.", C.TextDisabled);
-		if (button("Prompt: " + (funInput ? funInput.slice(0, 72) : "(tap to type)"))) funOpenKeyboard();
-		if (button("Send to Groq")) funSend();
-		if (funRequest) progressBar(0.5, "Groq is thinking...");
-		text("Status: " + funStatus, C.TextDisabled);
-		if (funReply) {
-			separator();
-			text("Response:", C.Accent);
-			for (const line of funReply.split(/\\n/)) text(line.slice(0, 180), C.Text);
-		}
-		separator();
-		text("Visual Toys", C.Accent);
-		text("Purely visual effects for the menu and HUD.", C.TextDisabled);
-		if (button("Rainbow UI")) {
-			visualRainbow=!visualRainbow; notify("Rainbow UI "+(visualRainbow?"on":"off"));
-		}
-		if (button("Invert UI")) {
-			visualInvert=!visualInvert; notify("UI invert "+(visualInvert?"on":"off"));
-		}
-		if (button("CRT Mode")) {
-			visualCRT=!visualCRT; notify("CRT mode "+(visualCRT?"on":"off"));
-		}
-		if (button("Matrix Rain")) {
-			visualMatrix=!visualMatrix; notify("Matrix rain "+(visualMatrix?"on":"off"));
-		}
-		if (button("Fake Error Screen")) { visualError=!visualError; notify("Fake error screen "+(visualError?"on":"off")); }
-		if (button("Doom Mode")) { visualDoom=!visualDoom; notify("Doom mode "+(visualDoom?"on":"off")); }
-		if (button("Windows 95 Mode")) { visualWin95=!visualWin95; notify("Windows 95 mode "+(visualWin95?"on":"off")); }
-		if (button("Reset Visual Toys")) {
-			visualRainbow=false; visualInvert=false; visualCRT=false; visualMatrix=false; visualError=false; visualDoom=false; visualWin95=false; visualApply();
-			notify("Visual toys reset");
+		if (collapsingHeader("Groq AI", true)) {
+			text("Ask Groq questions from inside the game.", C.TextDisabled);
+			if (button("Prompt: " + (funInput ? funInput.slice(0, 72) : "(tap to type)"))) funOpenKeyboard();
+			if (button("Send to Groq")) funSend();
+			if (funRequest) progressBar(0.5, "Groq is thinking...");
+			text("Status: " + funStatus, C.TextDisabled);
+			if (funReply) {
+				separator();
+				text("Response:", C.Accent);
+				for (const line of funReply.split(/\\n/)) text(line.slice(0, 180), C.Text);
+			}
 		}
 
-		if (visualMatrix) {
-			text("MATRIX RAIN", C.Accent);
-			for (const line of visualMatrixLines()) text(line, C.Text);
-		}
-		if (visualError) {
-			separator();
-			text("████ SYSTEM FAILURE ████", C.Accent);
-			text("KERNEL PANIC: UI.EXE", C.Text);
-			text("ERROR 0xC0FFEE", C.Text);
-			text("Reality.dll has stopped responding.", C.TextDisabled);
-			text("Press RESET to continue.", C.TextDisabled);
-		}
-		if (visualCRT) {
-			text("────────────────────────", C.TextDisabled);
-			text("CRT SIGNAL // 60Hz // SCANLINES", C.TextDisabled);
+		if (collapsingHeader("Visual Toys", false)) {
+			text("Purely visual effects for the menu and HUD.", C.TextDisabled);
+			if (button("Rainbow UI")) { visualRainbow=!visualRainbow; notify("Rainbow UI "+(visualRainbow?"on":"off")); }
+			if (button("Invert UI")) { visualInvert=!visualInvert; notify("UI invert "+(visualInvert?"on":"off")); }
+			if (button("CRT Mode")) { visualCRT=!visualCRT; notify("CRT mode "+(visualCRT?"on":"off")); }
+			if (button("Matrix Rain")) { visualMatrix=!visualMatrix; notify("Matrix rain "+(visualMatrix?"on":"off")); }
+			if (button("Fake Error Screen")) { visualError=!visualError; notify("Fake error screen "+(visualError?"on":"off")); }
+			if (button("Doom Mode")) { visualDoom=!visualDoom; notify("Doom mode "+(visualDoom?"on":"off")); }
+			if (button("Windows 95 Mode")) { visualWin95=!visualWin95; notify("Windows 95 mode "+(visualWin95?"on":"off")); }
+			if (button("Reset Visual Toys")) {
+				visualRainbow=false; visualInvert=false; visualCRT=false; visualMatrix=false; visualError=false; visualDoom=false; visualWin95=false; visualApply();
+				notify("Visual toys reset");
+			}
+			if (visualMatrix) {
+				text("MATRIX RAIN", C.Accent);
+				for (const line of visualMatrixLines()) text(line, C.Text);
+			}
+			if (visualError) {
+				separator();
+				text("████ SYSTEM FAILURE ████", C.Accent);
+				text("KERNEL PANIC: UI.EXE", C.Text);
+				text("ERROR 0xC0FFEE", C.Text);
+				text("Reality.dll has stopped responding.", C.TextDisabled);
+				text("Press RESET to continue.", C.TextDisabled);
+			}
+			if (visualCRT) {
+				text("────────────────────────", C.TextDisabled);
+				text("CRT SIGNAL // 60Hz // SCANLINES", C.TextDisabled);
+			}
 		}
 
-		separator();
-		text("API key: " + (funApiKey ? "set (runtime only)" : "not set"), C.TextDisabled);
-		text("Frida console: groq.setKey(\"...\")", C.TextDisabled);
-		text("Key is not stored in the repo.", C.TextDisabled);
-		separator();
+		if (collapsingHeader("Groq API Key", false)) {
+			text("API key: " + (funApiKey ? "set (runtime only)" : "not set"), C.TextDisabled);
+			text("Frida console: groq.setKey(\"...\")", C.TextDisabled);
+			text("Key is not stored in the repo.", C.TextDisabled);
+		}
+
 		toysTabBody();
 	}
-
 
 	function info() {
 		const bad = [1, 0.45, 0.5, 1];
