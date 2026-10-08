@@ -3,7 +3,7 @@ declare const Il2Cpp: any;
 
 declare const console: any;
 
-const CREDITS        = "by pepperoni, astraeus, and x3non";
+const CREDITS        = "blank"
 const MENU_TITLE     = "universal imgui";
 const DISCORD_URL    = "";
 const MENU_VERSION   = "v1.0";
