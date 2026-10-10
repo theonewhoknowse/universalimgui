@@ -72,63 +72,19 @@ const S = {
 };
 const MODES = ["Normal", "Fast", "Chaos"];
 
+const MovementBridge: { update: () => void; burst: (kind: "dash" | "jump") => void } = {
+	update: () => {},
+	burst: (_kind) => {},
+};
+
 function onUpdate(): void {
 	if (S.exampleToggle.v) {
 	}
-	if (S.moveFlight.v) {
-		try {
-			const rb = movementRigidbody();
-			const forward = rig.right ? get3(rig.right, "get_forward") : null;
-			if (rb && forward) call(rb, "AddForce", v3(-forward[0] * S.moveForce.v, -forward[1] * S.moveForce.v, -forward[2] * S.moveForce.v), 5);
-		} catch (e) { errOnce("movement flight", e); }
-	}
-}
-
-function movementRigidbody(): any {
-	if (!RigidbodyCls) return null;
-	// Prefer the right-hand parent: Gorilla-style rigs often place the player Rigidbody here.
-	try {
-		if (rig.right) {
-			let parent = call(rig.right, "get_parent");
-			for (let depth = 0; parent && depth < 4; depth++) {
-				const go = call(parent, "get_gameObject");
-				if (go) {
-					const rb = getComp(go, RigidbodyCls);
-					if (rb && alive(rb)) return rb;
-				}
-				parent = call(parent, "get_parent");
-			}
-		}
-	} catch {}
-	// Fallback to common player controller classes.
-	for (const name of PLAYER_CLASS_CANDIDATES) {
-		try {
-			const klass = findClassAnywhere(name);
-			const obj = objectOf(klass);
-			if (!obj) continue;
-			const go = obj.class.name === "GameObject" ? obj : call(obj, "get_gameObject");
-			if (go) {
-				const rb = getComp(go, RigidbodyCls);
-				if (rb && alive(rb)) return rb;
-			}
-		} catch {}
-	}
-	return null;
+	MovementBridge.update();
 }
 
 function movementBurst(kind: "dash" | "jump"): void {
-	const rb = movementRigidbody();
-	if (!rb) { notify("Player Rigidbody not found"); return; }
-	try {
-		if (kind === "jump") {
-			call(rb, "AddForce", v3(0, S.moveJump.v, 0), 2);
-		} else {
-			const forward = rig.right ? get3(rig.right, "get_forward") : null;
-			if (!forward) { notify("Right-hand direction unavailable"); return; }
-			call(rb, "AddForce", v3(forward[0] * S.moveDash.v, forward[1] * S.moveDash.v, forward[2] * S.moveDash.v), 2);
-		}
-		notify(kind === "jump" ? "SUPER JUMP" : "DASH!");
-	} catch (e) { errOnce("movement " + kind, e); notify("Movement action failed"); }
+	MovementBridge.burst(kind);
 }
 
 function drawMenu(ui: any): void {
@@ -400,6 +356,64 @@ Il2Cpp.perform(() => {
 	}
 	const getComp = (go: any, k: any) => componentCall("GetComponent", go, k);
 	const addComp = (go: any, k: any) => componentCall("AddComponent", go, k);
+
+	// Movement helpers must live inside Il2Cpp.perform so they can access
+	// the initialized IL2CPP wrappers and the live VR rig.
+	function movementRigidbody(): any {
+		if (!RigidbodyCls) return null;
+		try {
+			if (rig.right) {
+				let parent = call(rig.right, "get_parent");
+				for (let depth = 0; parent && depth < 4; depth++) {
+					const go = call(parent, "get_gameObject");
+					if (go) {
+						const rb = getComp(go, RigidbodyCls);
+						if (rb && alive(rb)) return rb;
+					}
+					parent = call(parent, "get_parent");
+				}
+			}
+		} catch {}
+		for (const name of PLAYER_CLASS_CANDIDATES) {
+			try {
+				const klass = findClassAnywhere(name);
+				if (!klass) continue;
+				const obj = objectOf(klass);
+				if (!obj) continue;
+				const go = obj.class.name === "GameObject" ? obj : call(obj, "get_gameObject");
+				if (go) {
+					const rb = getComp(go, RigidbodyCls);
+					if (rb && alive(rb)) return rb;
+				}
+			} catch {}
+		}
+		return null;
+	}
+
+	function movementBurstInternal(kind: "dash" | "jump"): void {
+		const rb = movementRigidbody();
+		if (!rb) { notify("Player Rigidbody not found"); return; }
+		try {
+			if (kind === "jump") {
+				call(rb, "AddForce", v3(0, S.moveJump.v, 0), 2);
+			} else {
+				const forward = rig.right ? get3(rig.right, "get_forward") : null;
+				if (!forward) { notify("Right-hand direction unavailable"); return; }
+				call(rb, "AddForce", v3(forward[0] * S.moveDash.v, forward[1] * S.moveDash.v, forward[2] * S.moveDash.v), 2);
+			}
+			notify(kind === "jump" ? "SUPER JUMP" : "DASH!");
+		} catch (e) { errOnce("movement " + kind, e); notify("Movement action failed"); }
+	}
+
+	MovementBridge.burst = movementBurstInternal;
+	MovementBridge.update = () => {
+		if (!S.moveFlight.v) return;
+		try {
+			const rb = movementRigidbody();
+			const forward = rig.right ? get3(rig.right, "get_forward") : null;
+			if (rb && forward) call(rb, "AddForce", v3(-forward[0] * S.moveForce.v, -forward[1] * S.moveForce.v, -forward[2] * S.moveForce.v), 5);
+		} catch (e) { errOnce("movement flight", e); }
+	};
 
 	function newGO(name: string): any {
 		try {
