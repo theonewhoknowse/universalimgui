@@ -374,6 +374,7 @@ Il2Cpp.perform(() => {
 				}
 			}
 		} catch {}
+		// Try known player controller singletons first.
 		for (const name of PLAYER_CLASS_CANDIDATES) {
 			try {
 				const klass = findClassAnywhere(name);
@@ -387,6 +388,25 @@ Il2Cpp.perform(() => {
 				}
 			} catch {}
 		}
+		// Generic fallback: select the nearest live Rigidbody to the tracked hand.
+		// This helps games whose player class has a different name.
+		try {
+			const handPos = rig.right ? get3(rig.right, "get_position") : null;
+			let best: any = null, bestD = 2.5;
+			if (handPos) {
+				for (const rb of objectsOf(RigidbodyCls)) {
+					try {
+						if (!alive(rb)) continue;
+						const tr = call(rb, "get_transform");
+						const p = tr ? get3(tr, "get_position") : null;
+						if (!p) continue;
+						const d = Math.hypot(p[0] - handPos[0], p[1] - handPos[1], p[2] - handPos[2]);
+						if (d < bestD) { bestD = d; best = rb; }
+					} catch {}
+				}
+			}
+			if (best) return best;
+		} catch (e) { errOnce("movement Rigidbody scan", e); }
 		return null;
 	}
 
@@ -411,7 +431,7 @@ Il2Cpp.perform(() => {
 		try {
 			const rb = movementRigidbody();
 			const forward = rig.right ? get3(rig.right, "get_forward") : null;
-			if (rb && forward) call(rb, "AddForce", v3(-forward[0] * S.moveForce.v, -forward[1] * S.moveForce.v, -forward[2] * S.moveForce.v), 5);
+			if (rb && forward) call(rb, "AddForce", v3(-forward[0] * S.moveForce.v, -forward[1] * S.moveForce.v, -forward[2] * S.moveForce.v), 0);
 		} catch (e) { errOnce("movement flight", e); }
 	};
 
