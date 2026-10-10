@@ -103,10 +103,11 @@ function drawMenu(ui: any): void {
 		if (ui.tabItem("Movement")) {
 			ui.text("Built-in VR movement controls. No plugin bundle required.");
 			ui.separator();
-			if (ui.checkbox("Hand Flight", S.moveFlight, "Pushes you opposite your right palm")) {
-				ui.notify("Hand Flight " + (S.moveFlight.v ? "enabled" : "disabled"));
+			if (ui.checkbox("Hand Flight", S.moveFlight, "Hold either controller trigger to push off that hand")) {
+				ui.notify("Hand Flight " + (S.moveFlight.v ? "enabled: hold trigger(s) to fly" : "disabled"));
 			}
 			ui.sliderFloat("Flight Force", S.moveForce, 1, 80);
+			ui.text("Hold left or right trigger to fly. Release to stop.");
 			ui.sliderFloat("Dash Force", S.moveDash, 1, 80);
 			ui.sliderFloat("Jump Force", S.moveJump, 1, 80);
 			if (ui.button("Dash Forward")) movementBurst("dash");
@@ -426,12 +427,49 @@ Il2Cpp.perform(() => {
 	}
 
 	MovementBridge.burst = movementBurstInternal;
+	function movementTriggerValue(hand: "left" | "right"): number {
+		const node = hand === "left" ? 4 : 5; // Unity XRNode.LeftHand / RightHand
+		if (xrReady && usageTrig) {
+			const value = xrFloat(node, usageTrig);
+			if (value !== null) return value;
+		}
+		if (ovr.axis) {
+			try {
+				const v: any = ovr.axis.invoke(ovr.index, hand === "left" ? ovr.L : ovr.R);
+				if (typeof v === "number") return v;
+				if (v && typeof v.value === "number") return v.value;
+				if (v && v.handle) return v.handle.readFloat();
+			} catch {}
+		}
+		if (hand === "right" && hvr.inputs) {
+			try { return hvrTrigger(); } catch {}
+		}
+		if (legacyGetAxis && legacyAxisOK !== false) {
+			const names = hand === "left"
+				? ["Oculus_CrossPlatform_PrimaryIndexTrigger", "LIndexTrigger", "LeftTrigger"]
+				: ["Oculus_CrossPlatform_SecondaryIndexTrigger", "Oculus_CrossPlatform_PrimaryIndexTrigger", "RIndexTrigger", "RightTrigger"];
+			for (const name of names) {
+				try {
+					const value = Number(legacyGetAxis.invoke(Il2Cpp.string(name)));
+					if (Number.isFinite(value)) { legacyAxisOK = true; if (value > 0.01) return value; }
+				} catch {}
+			}
+		}
+		return 0;
+	}
 	MovementBridge.update = () => {
 		if (!S.moveFlight.v) return;
 		try {
 			const rb = movementRigidbody();
-			const forward = rig.right ? get3(rig.right, "get_forward") : null;
-			if (rb && forward) call(rb, "AddForce", v3(-forward[0] * S.moveForce.v, -forward[1] * S.moveForce.v, -forward[2] * S.moveForce.v), 0);
+			if (!rb) return;
+			const threshold = 0.55;
+			const hands: any[] = [];
+			if (movementTriggerValue("left") > threshold && rig.left) hands.push(rig.left);
+			if (movementTriggerValue("right") > threshold && rig.right) hands.push(rig.right);
+			for (const hand of hands) {
+				const forward = get3(hand, "get_forward");
+				if (forward) call(rb, "AddForce", v3(-forward[0] * S.moveForce.v, -forward[1] * S.moveForce.v, -forward[2] * S.moveForce.v), 0);
+			}
 		} catch (e) { errOnce("movement flight", e); }
 	};
 
