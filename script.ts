@@ -65,12 +65,70 @@ const S = {
 	speed:         ref(1.0),
 	count:         ref(3),
 	mode:          ref(0),
+	moveFlight:    ref(false),
+	moveForce:     ref(18.0),
+	moveDash:      ref(22.0),
+	moveJump:      ref(16.0),
 };
 const MODES = ["Normal", "Fast", "Chaos"];
 
 function onUpdate(): void {
 	if (S.exampleToggle.v) {
 	}
+	if (S.moveFlight.v) {
+		try {
+			const rb = movementRigidbody();
+			const forward = rig.right ? get3(rig.right, "get_forward") : null;
+			if (rb && forward) call(rb, "AddForce", v3(-forward[0] * S.moveForce.v, -forward[1] * S.moveForce.v, -forward[2] * S.moveForce.v), 5);
+		} catch (e) { errOnce("movement flight", e); }
+	}
+}
+
+function movementRigidbody(): any {
+	if (!RigidbodyCls) return null;
+	// Prefer the right-hand parent: Gorilla-style rigs often place the player Rigidbody here.
+	try {
+		if (rig.right) {
+			let parent = call(rig.right, "get_parent");
+			for (let depth = 0; parent && depth < 4; depth++) {
+				const go = call(parent, "get_gameObject");
+				if (go) {
+					const rb = getComp(go, RigidbodyCls);
+					if (rb && alive(rb)) return rb;
+				}
+				parent = call(parent, "get_parent");
+			}
+		}
+	} catch {}
+	// Fallback to common player controller classes.
+	for (const name of PLAYER_CLASS_CANDIDATES) {
+		try {
+			const klass = findClassAnywhere(name);
+			const obj = objectOf(klass);
+			if (!obj) continue;
+			const go = obj.class.name === "GameObject" ? obj : call(obj, "get_gameObject");
+			if (go) {
+				const rb = getComp(go, RigidbodyCls);
+				if (rb && alive(rb)) return rb;
+			}
+		} catch {}
+	}
+	return null;
+}
+
+function movementBurst(kind: "dash" | "jump"): void {
+	const rb = movementRigidbody();
+	if (!rb) { notify("Player Rigidbody not found"); return; }
+	try {
+		if (kind === "jump") {
+			call(rb, "AddForce", v3(0, S.moveJump.v, 0), 2);
+		} else {
+			const forward = rig.right ? get3(rig.right, "get_forward") : null;
+			if (!forward) { notify("Right-hand direction unavailable"); return; }
+			call(rb, "AddForce", v3(forward[0] * S.moveDash.v, forward[1] * S.moveDash.v, forward[2] * S.moveDash.v), 2);
+		}
+		notify(kind === "jump" ? "SUPER JUMP" : "DASH!");
+	} catch (e) { errOnce("movement " + kind, e); notify("Movement action failed"); }
 }
 
 function drawMenu(ui: any): void {
@@ -85,6 +143,20 @@ function drawMenu(ui: any): void {
 			if (ui.button("Example Action")) ui.notify("Example Action ran");
 			ui.sameLine();
 			if (ui.button("Another")) console.log("[menu] another");
+		}
+		if (ui.tabItem("Movement")) {
+			ui.text("Built-in VR movement controls. No plugin bundle required.");
+			ui.separator();
+			if (ui.checkbox("Hand Flight", S.moveFlight, "Pushes you opposite your right palm")) {
+				ui.notify("Hand Flight " + (S.moveFlight.v ? "enabled" : "disabled"));
+			}
+			ui.sliderFloat("Flight Force", S.moveForce, 1, 80);
+			ui.sliderFloat("Dash Force", S.moveDash, 1, 80);
+			ui.sliderFloat("Jump Force", S.moveJump, 1, 80);
+			if (ui.button("Dash Forward")) movementBurst("dash");
+			ui.sameLine();
+			if (ui.button("Super Jump")) movementBurst("jump");
+			ui.text("Movement requires a Rigidbody on your player rig or right-hand parent.");
 		}
 		if (ui.tabItem("Extras")) {
 			if (ui.collapsingHeader("More", true)) {
